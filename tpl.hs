@@ -75,17 +75,14 @@ parseId = do head <- letter <|> char '_'
              return $ Id $ head:contents
 
 parseOperator :: Parser TPLValue
-parseOperator = do op <- many1 $ oneOf "+-=*&^%$#@!?/.|~<>:"
-                   return $ Operator op
+parseOperator = many1 (oneOf "+-=*&^%$#@!?/.|~<>:") >>= return . Operator
 
 parseNumber :: Parser TPLValue
-parseNumber = do value <- many1 digit
-                 return $ Number $ read value
+parseNumber = many1 digit >>= return . Number . read
 
 parseList :: Parser TPLValue
-parseList = do contents <- between (char '[') (char ']')
-                                  (parseTPL `sepBy` (spaces >> char ','))
-               return $ List contents
+parseList = between (char '[') (char ']') 
+            (parseTPL `sepBy` (spaces >> char ',')) >>= return . List
 
 parseLambda :: Parser TPLValue
 parseLambda = do parameters <- between (oneOf "\\λ") (string "->")
@@ -111,7 +108,7 @@ parseTPL = spaces >> (parseLambda
                   <|> parseParenExp)
 
 parseExpressions :: Parser [TPLValue]
-parseExpressions = parseExpression `sepBy` (oneOf ";\n")
+parseExpressions = parseExpression `sepBy` oneOf ";\n"
 
 readExpr :: String -> [TPLValue]
 readExpr expr = case parse parseExpressions "TPL" expr of
@@ -123,12 +120,11 @@ eval (Expression [val]) = eval val
 eval (Expression [a, (Operator op), b]) = do aVal <- eval a
                                              bVal <- eval b
                                              (operate op) aVal bVal
-eval val = return $ val
+eval val = return val
 
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
-  do result <- foldl1 (.) handleAll $ return exp
-     return $ Expression result
+  foldl1 (.) handleAll (return exp) >>= return . Expression
   where
     handleAll = map (flip (>>=) . handle) operatorPrecedences
     handle _ [] = return []
@@ -136,14 +132,14 @@ handleInfix (Expression exp) =
     handle _ [a] = return [a]
     handle precedence exp@[left, (Operator op)]
       | precedenceOf op == precedence = throwError $ MissingOperand op
-      | otherwise = return $ exp
+      | otherwise = return exp
     handle precedence exp@[(Operator op), right]
       | precedenceOf op == precedence = throwError $ MissingOperand op
-      | otherwise = return $ exp
+      | otherwise = return exp
     handle _ [a, b] = return [a, b]
-    handle precedence (left : op@(Operator opStr) : right : more)
-      | precedenceOf opStr == precedence =
-        handle precedence $ (Expression [left, op, right]) : more
+    handle precedence vals@(left : op@(Operator opStr) : right : more)
+      | precedenceOf opStr == precedence = 
+        handle precedence $ Expression [left, op, right] : more
       | otherwise = handle precedence (op:right:more) >>= return . (left:)
     handle precedence (left:more) = handle precedence more >>= return . (left:)
 handleInfix value = return value
@@ -157,7 +153,6 @@ precedenceOf :: String -> Int
 precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 
 operatorPrecedences = [10,9..0]
-
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 4),
                       ("==", 8), ("!=", 8)]
@@ -167,18 +162,17 @@ operate op left right =
   maybe (throwError $ BadOp op) (\ fn -> fn left right) (lookup op operators)
 
 numericBinOp :: (Int -> Int -> Int) -> (TPLValue -> TPLValue -> ThrowsError TPLValue)
-numericBinOp op = doOp
-  where doOp (Number left) (Number right) = return $ Number $ op left right
-        doOp (String str) right = doOp (Number (read str)) right
-        doOp left (String str) = doOp left $ Number $ read str
-        doOp left (Number _) = throwError $ TypeMismatch "Number" (show left)
-        doOp (Number _) right = throwError $ TypeMismatch "Number" (show right)
+numericBinOp op (Number l) (Number r) = return $ Number $ op l r
+numericBinOp op (String str) r = numericBinOp op (Number (read str)) r
+numericBinOp op l (String str) = numericBinOp op l $ Number $ read str
+numericBinOp op l (Number _) = throwError $ TypeMismatch "Number" (show l)
+numericBinOp op (Number _) r = throwError $ TypeMismatch "Number" (show r)
 
 strBinOp :: (String -> String -> String) -> (TPLValue -> TPLValue -> ThrowsError TPLValue)
-strBinOp op = \ left right -> return $ String $ op (show left) (show right)
+strBinOp op left right = return $ String $ op (show left) (show right)
 
 boolBinOp :: (String -> String -> Bool) -> (TPLValue -> TPLValue -> ThrowsError TPLValue)
-boolBinOp op = \ left right -> return $ Boolean $ op (show left) (show right)
+boolBinOp op left right = return $ Boolean $ op (show left) (show right)
 
 unpack :: ThrowsError TPLValue -> TPLValue
 unpack (Right val) = val
