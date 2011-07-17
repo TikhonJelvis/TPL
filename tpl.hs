@@ -44,7 +44,7 @@ showTPLE (MissingOperand op) = "Missing operand for " ++ op
 showTPLE (UndefinedVariable var) = "Variable " ++ var ++ " is undefined"
 
 instance Show TPLError where
-  show = \ err -> "Error: " ++ showTPLE err ++ "."
+  show err = "Error: " ++ showTPLE err ++ "."
 instance Error TPLError where
   noMsg = Default "An error has occured!"
   strMsg = Default
@@ -66,7 +66,7 @@ specChar = do char <- oneOf "\"\\nt'"
 parseString :: Parser TPLValue
 parseString = do opener <- oneOf "\"'"
                  contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
-                 oneOf "\"'"
+                 char opener
                  return $ String contents
 
 parseId :: Parser TPLValue
@@ -79,19 +79,16 @@ parseOperator = do op <- many1 $ oneOf "+-=*&^%$#@!?/.|~<>:"
                    return $ Operator op
 
 parseNumber :: Parser TPLValue
-parseNumber = do head <- digit
-                 tail <- many digit
-                 return $ Number $ read $ head : tail
+parseNumber = do value <- many1 digit
+                 return $ Number $ read value
 
 parseList :: Parser TPLValue
-parseList = do contents <- between (char '[')
-                                  (char ']')
+parseList = do contents <- between (char '[') (char ']')
                                   (parseTPL `sepBy` (spaces >> char ','))
                return $ List contents
 
 parseLambda :: Parser TPLValue
-parseLambda = do parameters <- between (oneOf "\\λ")
-                                      (string "->")
+parseLambda = do parameters <- between (oneOf "\\λ") (string "->")
                                       (id `sepBy` (spaces >> char ','))
                  body <- spaces >> parseExpression
                  return $ Function parameters body
@@ -99,8 +96,7 @@ parseLambda = do parameters <- between (oneOf "\\λ")
                 spaces >> return id
 
 parseExpression :: Parser TPLValue
-parseExpression = do vals <- many parseTPL
-                     return $ Expression vals
+parseExpression = many parseTPL >>= return . Expression
 
 parseParenExp :: Parser TPLValue
 parseParenExp = between (char '(') (char ')') parseExpression
@@ -115,8 +111,7 @@ parseTPL = spaces >> (parseLambda
                   <|> parseParenExp)
 
 parseExpressions :: Parser [TPLValue]
-parseExpressions = do exps <- parseExpression `sepBy` (oneOf ";\n")
-                      return exps
+parseExpressions = parseExpression `sepBy` (oneOf ";\n")
 
 readExpr :: String -> [TPLValue]
 readExpr expr = case parse parseExpressions "TPL" expr of
@@ -128,7 +123,6 @@ eval (Expression [val]) = eval val
 eval (Expression [a, (Operator op), b]) = do aVal <- eval a
                                              bVal <- eval b
                                              (operate op) aVal bVal
-
 eval val = return $ val
 
 handleInfix :: TPLValue -> ThrowsError TPLValue
@@ -150,11 +144,8 @@ handleInfix (Expression exp) =
     handle precedence (left : op@(Operator opStr) : right : more)
       | precedenceOf opStr == precedence =
         handle precedence $ (Expression [left, op, right]) : more
-      | otherwise = do res <- handle precedence $ op : right : more
-                       return $ left : res
-    handle precedence (left : mid : right : more) =
-      do res <- handle precedence $ mid : right : more
-         return $ left : res
+      | otherwise = handle precedence (op:right:more) >>= return . (left:)
+    handle precedence (left:more) = handle precedence more >>= return . (left:)
 handleInfix value = return value
 
 operators = [("+", numericBinOp (+)), ("-", numericBinOp (-)),
@@ -163,9 +154,9 @@ operators = [("+", numericBinOp (+)), ("-", numericBinOp (-)),
              ("==", boolBinOp (==)), ("!=", boolBinOp (/=))]
 
 precedenceOf :: String -> Int
-precedenceOf op = fromMaybe 0 (lookup op operatorPrecedence)
+precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 
-operatorPrecedences = reverse [0..10]
+operatorPrecedences = [10,9..0]
 
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 4),
@@ -194,6 +185,5 @@ unpack (Right val) = val
 unpack (Left err) = String $ show err
 
 main :: IO ()
-main = do line <- getLine
-          putStr $ unlines $ (map toStr) $ readExpr line
+main = getLine >>= putStr . unlines . (map toStr) . readExpr
   where toStr = show . unpack . (>>= eval) . handleInfix
