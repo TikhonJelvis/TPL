@@ -3,6 +3,7 @@ module Main where
 import Control.Monad.Error
 import Data.IORef
 import Data.Maybe
+import Debug.Trace
 import IO hiding (try)
 import Text.ParserCombinators.Parsec hiding (State)
 
@@ -25,7 +26,7 @@ instance Show TPLValue where
   show (Operator name) = name
   show (Boolean bool) = show bool
   show (List vals) = show vals
-  show (Expression vals) = showSeq vals
+  show (Expression vals) = "<" ++ showSeq vals ++ ">"
   show (Function params body) =
     "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
 
@@ -97,7 +98,7 @@ defineVar env id@(Id name) val =
                         envContents <- readIORef env
                         writeIORef env $ (name, valContents) : envContents
                         return val
-                        
+
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
   where extend bindings env = liftM (++ env) (mapM addBinding bindings)
@@ -135,13 +136,14 @@ parseList = between (char '[') (char ']')
             (parseTPL `sepBy` (spaces >> char ',')) >>= return . List
 
 parseLambda :: Parser TPLValue
-parseLambda = do parameters <- between (oneOf "\\λ") (string "->")
-                                      (id `sepBy` (spaces >> char ','))
-                 body <- spaces >> parseExpression
+parseLambda = do oneOf "\\λ"
+                 parameters <- many id
+                 string "->"
+                 body <- parseExpression
                  return $ Function parameters body
   where id = do id <- spaces >> parseId
                 spaces >> return id
-
+             
 parseExpression :: Parser TPLValue
 parseExpression = many parseTPL >>= return . Expression
 
@@ -167,17 +169,30 @@ readExp exp = case parse parseExpressions "TPL" exp of
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
 eval env (Id id) = getVar env id
-eval env (Expression [val]) = eval env val
-eval env (Expression [a, (Operator op), b]) = (operate op) env a b
-eval env (Expression (id@(Id _) : rest)) = 
-  do val <- eval env id
-     eval env $ Expression $ val : rest
-eval env val@(Expression _) = liftThrows (handleInfix val) >>= eval env
+eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
 eval env val = return val
+
+evalExp :: Env -> TPLValue -> IOThrowsError TPLValue
+evalExp env (Expression [a, (Operator op), b]) = (operate op) env a b
+evalExp env (Expression (id@(Id _) : rest)) = 
+  do res <- eval env id
+     evalExp env $ Expression (res : rest)
+evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
+evalExp env val = eval env val
+
+apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
+apply env (Function params body) args = 
+  do args <- mapM (eval env) args
+     newEnv <- liftIO $ bindVars env $ zip (map show params) args
+     eval newEnv body
+
+squash :: TPLValue -> TPLValue
+squash (Expression [val]) = val
+squash val = val
 
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
-  foldl1 (.) handleAll (return exp) >>= return . Expression
+  foldl1 (.) handleAll (return exp) >>= return . squash . Expression
   where
     handleAll = map (flip (>>=) . handle) operatorPrecedences
     handle _ [] = return []
@@ -197,21 +212,24 @@ handleInfix (Expression exp) =
     handle precedence (left:more) = handle precedence more >>= return . (left:)
 handleInfix value = return value
 
-eagerLeft :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+eagerLeft :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
+             (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 eagerLeft op env l r = do lVal <- eval env l
                           op env lVal r
                        
-eagerRight :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+eagerRight :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
+              (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 eagerRight op env l r = do rVal <- eval env r
                            op env l rVal
                            
-eager = eagerRight . eagerLeft
+eager = eagerLeft . eagerRight
 
 operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)),
              ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div),
              ("><", eager $ strBinOp (++)),
              ("==", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
-             ("=", defineVar)]
+             (":", eager cons), ("!!", eager index),
+             ("=", eagerRight defineVar)]
 
 precedenceOf :: String -> Int
 precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
@@ -219,12 +237,14 @@ precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
-                      ("==", 8), ("!=", 8)]
+                      ("==", 8), ("!=", 8), 
+                      (":", 9), ("!!", 9),
+                      ("=", 10)]
 
 operate :: String -> Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 operate op env left right =
   maybe (liftThrows $ throwError $ BadOp op) 
-        (\ fn -> fn env left right) 
+        (\ fn -> fn env left right)
         (lookup op operators)
 
 numericBinOp :: (Int -> Int -> Int) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
@@ -236,6 +256,15 @@ numericBinOp op _ (Number _) r = liftThrows $ throwError $ TypeMismatch "Number"
 
 strBinOp :: (String -> String -> String) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 strBinOp op _ left right = liftThrows $ return $ String $ op (show left) (show right)
+
+cons :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
+cons env head (List tail) = return $ List $ head : tail
+cons env head tail = return $ List $ head : [tail]
+
+index :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
+index env (List list) (Number i) = return $ list !! i
+index env (List list) (String str) = return $ list !! read str
+index env val i = index env (List [val]) i
 
 boolBinOp :: (String -> String -> Bool) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 boolBinOp op _ left right = liftThrows $ return $ Boolean $ op (show left) (show right)
@@ -249,8 +278,7 @@ readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
 
 evalString :: Env -> String -> IO String
 evalString env exp = runIOThrows $ liftM show $ 
-                     (liftThrows $ readExp exp) >>= eval env
-
+                     (liftThrows $ readExp exp >>= return . squash) >>= eval env
 evalAndPrint :: Env -> String -> IO ()
 evalAndPrint env exp = evalString env exp >>= putStrLn
 
