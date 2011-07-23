@@ -9,6 +9,12 @@ Currently the idea is for it to be simple, dynamically typed, interpreted, impur
 ## Progress
 So far I have some basic operators like `+, -, *, /` working with rampant type coercion. Equality (`==` and `!=`) also work with type coercion. Additionally `><` concatenates strings since using `+` in a language with weak typing for concatenation is just silly (*cough* JavaScript). 
 
-Lambdas are written in the form `\arg1, arg2 -> body`. They are parsed correctly but are completely useless right now.
+Lambdas are written in the form `\arg1 arg2 -> body`. They can be
+assigned to a variable (`a = \ a b -> a + b`) and then used.
+
+Two operators for working with lists have been added: `:` is cons and
+`!!` is index. Both of these have been blatantly adopted from
+Haskell. Both can coerce non-list values into lists of just that
+value. That is, `1 : 2` is the same as `1 : [2]`.
 
 More stuff should be along shortly. Hopefully.
