@@ -17,4 +17,11 @@ Two operators for working with lists have been added: `:` is cons and
 Haskell. Both can coerce non-list values into lists of just that
 value. That is, `1 : 2` is the same as `1 : [2]`.
 
+Booleans are supported, as is a Haskell-style if statement: `if
+<condition> then <consequent> else <alternate>`. However, this
+statement does not work with complicated expressions in any part of it.
+
+Currently dealing with more than one expression anywhere does not work
+very well either; this really needs to be fixed.
+
 More stuff should be along shortly. Hopefully.
