@@ -15,6 +15,7 @@ data TPLValue = Id String
               | List [TPLValue]
               | Expression [TPLValue]
               | Function [TPLValue] TPLValue
+              | If TPLValue TPLValue TPLValue
 
 showSeq :: [TPLValue] -> String
 showSeq = foldl1 ((++) . (++ " ")) . (map show)
@@ -24,11 +25,14 @@ instance Show TPLValue where
   show (String str) = show str
   show (Number int) = show int
   show (Operator name) = name
-  show (Boolean bool) = show bool
+  show (Boolean bool) = "#<" ++ show bool ++ ">"
   show (List vals) = show vals
   show (Expression vals) = "<" ++ showSeq vals ++ ">"
   show (Function params body) =
     "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
+  show (If condition consequent alternate) = "<if> " ++ show condition ++
+                                             " <then> " ++ show consequent ++
+                                             " <else> " ++ show alternate
 
 data TPLError = Parser ParseError
               | BadOp String
@@ -73,7 +77,8 @@ nullEnv :: IO Env
 nullEnv = newIORef []
 
 existsVar :: Env -> String -> IO Bool
-existsVar env name = readIORef env >>= return . maybe False (const True) . lookup name
+existsVar env name = readIORef env >>= 
+                     return . maybe False (const True) . lookup name
 
 getVar :: Env -> String -> IOThrowsError TPLValue
 getVar env name = 
@@ -120,6 +125,12 @@ parseString = do opener <- oneOf "\"'"
                  char opener
                  return $ String contents
 
+parseBool :: Parser TPLValue
+parseBool = try (do spaces
+                    str <- string "true" <|> string "false"
+                    spaces
+                    return $ Boolean $ str == "true")
+               
 parseId :: Parser TPLValue
 parseId = do head <- letter <|> char '_'
              contents <- many $ letter <|> digit <|> oneOf "_!?"
@@ -147,11 +158,22 @@ parseLambda = do oneOf "\\λ"
 parseExpression :: Parser TPLValue
 parseExpression = many parseTPL >>= return . Expression
 
+parseIf :: Parser TPLValue
+parseIf = try (do spaces >> string "if" >> spaces
+                  condition <- parseTPL
+                  spaces >> string "then" >> spaces
+                  consequent <- parseTPL
+                  spaces >> string "else" >> spaces
+                  alternate <- parseTPL
+                  return $ If condition consequent alternate)
+
 parseParenExp :: Parser TPLValue
 parseParenExp = between (char '(') (char ')') parseExpression
 
 parseTPL :: Parser TPLValue
 parseTPL = spaces >> (parseLambda
+                  <|> parseIf
+                  <|> parseBool
                   <|> parseId
                   <|> parseString
                   <|> parseNumber
@@ -168,6 +190,11 @@ readExp exp = case parse parseExpressions "TPL" exp of
   Right val -> return $ Expression val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
+eval env (If (Boolean condition) consequent alternate) = 
+  if condition then eval env consequent else eval env alternate
+eval env (If condition consequent alternate) = 
+  do condVal <- eval env condition
+     eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
 eval env val = return val
@@ -247,15 +274,18 @@ operate op env left right =
         (\ fn -> fn env left right)
         (lookup op operators)
 
-numericBinOp :: (Int -> Int -> Int) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+numericBinOp :: (Int -> Int -> Int) ->
+                (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 numericBinOp op _ (Number l) (Number r) = liftThrows $ return $ Number $ op l r
 numericBinOp op env (String str) r = numericBinOp op env (Number (read str)) r
 numericBinOp op env l (String str) = numericBinOp op env l $ Number $ read str
 numericBinOp op _ l (Number _) = liftThrows $ throwError $ TypeMismatch "Number" (show l)
 numericBinOp op _ (Number _) r = liftThrows $ throwError $ TypeMismatch "Number" (show r)
 
-strBinOp :: (String -> String -> String) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-strBinOp op _ left right = liftThrows $ return $ String $ op (show left) (show right)
+strBinOp :: (String -> String -> String) ->
+            (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+strBinOp op _ left right = 
+  liftThrows $ return $ String $ op (show left) (show right)
 
 cons :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 cons env head (List tail) = return $ List $ head : tail
@@ -266,8 +296,10 @@ index env (List list) (Number i) = return $ list !! i
 index env (List list) (String str) = return $ list !! read str
 index env val i = index env (List [val]) i
 
-boolBinOp :: (String -> String -> Bool) -> (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-boolBinOp op _ left right = liftThrows $ return $ Boolean $ op (show left) (show right)
+boolBinOp :: (String -> String -> Bool) ->
+             (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+boolBinOp op _ left right = 
+  liftThrows $ return $ Boolean $ op (show left) (show right)
 
 unpack :: ThrowsError TPLValue -> TPLValue
 unpack (Right val) = val
