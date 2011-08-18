@@ -146,7 +146,7 @@ parseNumber = many1 digit >>= return . Number . read
 
 parseList :: Parser TPLValue
 parseList = between (char '[') (char ']')
-            (parseTPL `sepBy` (spaces >> char ',')) >>= return . List
+            (parseExpression `sepBy` (spaces >> char ',')) >>= return . List
 
 parseLambda :: Parser TPLValue
 parseLambda = do oneOf "\\λ"
@@ -164,16 +164,16 @@ parseIf :: Parser TPLValue
 parseIf = try $ do spaces >> string "if" >> spaces
                    condition <- parseParenExp
                    spaces >> char '{' >> spaces
-                   consequent <- parseTPL
+                   consequent <- many1 parseTPL
                    spaces >> char '}' >> spaces
-                   return $ If condition consequent Null
+                   return $ If condition (Expression consequent) Null
 
 parseElse :: Parser TPLValue
 parseElse = try $ do spaces >> string "else" >> spaces
                      char '{' >> spaces
-                     alternate <- parseTPL
+                     alternate <- many1 parseTPL
                      spaces >> char '}' >> spaces
-                     return alternate
+                     return $ Expression alternate
 
 parseIfElse :: Parser TPLValue
 parseIfElse = try $ do ifPart <- parseIf
@@ -213,6 +213,7 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
+eval env (List vals) = liftM List $ mapM (eval env) vals
 eval env val = return val
 
 evalExp :: Env -> TPLValue -> IOThrowsError TPLValue
@@ -267,11 +268,11 @@ eagerRight op env l r = do rVal <- eval env r
                            
 eager = eagerLeft . eagerRight
 
-operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)),
-             ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div),
-             ("><", eager $ strBinOp (++)),
+operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)), 
+             ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div), 
+             ("><", eager $ strBinOp (++)),                                    
              ("==", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
-             (":", eager cons), ("!!", eager index),
+             (":", eager cons), ("!!", eager index), ("..", eager range),
              ("=", eagerRight defineVar)]
 
 precedenceOf :: String -> Int
@@ -281,7 +282,7 @@ operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
                       ("==", 8), ("!=", 8), 
-                      (":", 9), ("!!", 9),
+                      (":", 9), ("!!", 9), ("..", 9),
                       ("=", 10)]
 
 operate :: String -> Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
@@ -289,6 +290,11 @@ operate op env left right =
   maybe (liftThrows $ throwError $ BadOp op) 
         (\ fn -> fn env left right)
         (lookup op operators)
+
+toNumber :: TPLValue -> ThrowsError TPLValue
+toNumber num@(Number _) = return num
+toNumber (String str) = return $ Number $ read str
+toNumber val = throwError $ TypeMismatch "Number" (show val)
 
 numericBinOp :: (Int -> Int -> Int) ->
                 (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
@@ -311,6 +317,9 @@ index :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 index env (List list) (Number i) = return $ list !! i
 index env (List list) (String str) = return $ list !! read str
 index env val i = index env (List [val]) i
+
+range :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
+range env (Number start) (Number end) = return $ List $ map Number [start..end]
 
 boolBinOp :: (String -> String -> Bool) ->
              (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
