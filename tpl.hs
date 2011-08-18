@@ -7,7 +7,8 @@ import Debug.Trace
 import IO hiding (try)
 import Text.ParserCombinators.Parsec hiding (State)
 
-data TPLValue = Id String
+data TPLValue = Null
+              | Id String
               | Number Int
               | String String
               | Boolean Bool
@@ -21,6 +22,7 @@ showSeq :: [TPLValue] -> String
 showSeq = foldl1 ((++) . (++ " ")) . (map show)
 
 instance Show TPLValue where
+  show (Null) = "null"
   show (Id id) = id
   show (String str) = show str
   show (Number int) = show int
@@ -159,19 +161,33 @@ parseExpression :: Parser TPLValue
 parseExpression = many parseTPL >>= return . Expression
 
 parseIf :: Parser TPLValue
-parseIf = try (do spaces >> string "if" >> spaces
-                  condition <- parseTPL
-                  spaces >> string "then" >> spaces
-                  consequent <- parseTPL
-                  spaces >> string "else" >> spaces
-                  alternate <- parseTPL
-                  return $ If condition consequent alternate)
+parseIf = try $ do spaces >> string "if" >> spaces
+                   condition <- parseParenExp
+                   spaces >> char '{' >> spaces
+                   consequent <- parseTPL
+                   spaces >> char '}' >> spaces
+                   return $ If condition consequent Null
+
+parseElse :: Parser TPLValue
+parseElse = try $ do spaces >> string "else" >> spaces
+                     char '{' >> spaces
+                     alternate <- parseTPL
+                     spaces >> char '}' >> spaces
+                     return alternate
+
+parseIfElse :: Parser TPLValue
+parseIfElse = try $ do ifPart <- parseIf
+                       elsePart <- parseElse
+                       return $ append ifPart elsePart
+  where append (If condition consequent _) alternate = 
+          If condition consequent alternate
 
 parseParenExp :: Parser TPLValue
 parseParenExp = between (char '(') (char ')') parseExpression
 
 parseTPL :: Parser TPLValue
 parseTPL = spaces >> (parseLambda
+                  <|> parseIfElse
                   <|> parseIf
                   <|> parseBool
                   <|> parseId
