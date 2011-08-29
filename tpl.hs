@@ -5,6 +5,8 @@ import Data.IORef
 import Data.Maybe
 import Debug.Trace
 import IO hiding (try)
+import List
+import System.Environment
 import Text.ParserCombinators.Parsec hiding (State)
 
 data TPLValue = Null
@@ -19,12 +21,13 @@ data TPLValue = Null
               | If TPLValue TPLValue TPLValue
 
 showSeq :: [TPLValue] -> String
-showSeq = foldl1 ((++) . (++ " ")) . (map show)
+showSeq [] = ""
+showSeq vals = foldl1 ((++) . (++ " ")) $ (map show) vals
 
 instance Show TPLValue where
   show (Null) = "null"
   show (Id id) = id
-  show (String str) = show str
+  show (String str) = "\"" ++ str ++ "\""
   show (Number int) = show int
   show (Operator name) = name
   show (Boolean bool) = "#<" ++ show bool ++ ">"
@@ -79,8 +82,8 @@ nullEnv :: IO Env
 nullEnv = newIORef []
 
 existsVar :: Env -> String -> IO Bool
-existsVar env name = readIORef env >>= 
-                     return . maybe False (const True) . lookup name
+existsVar env name = liftM (maybe False (const True) . lookup name) $
+                     readIORef env
 
 getVar :: Env -> String -> IOThrowsError TPLValue
 getVar env name = 
@@ -121,87 +124,96 @@ specChar = do char <- oneOf "\"\\nt'"
                 '\\' -> '\\'
                 '\'' -> '\''
 
-parseString :: Parser TPLValue
-parseString = do opener <- oneOf "\"'"
-                 contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
-                 char opener
-                 return $ String contents
+stringLiteral :: Parser TPLValue
+stringLiteral = do opener <- oneOf "\"'"
+                   contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
+                   char opener
+                   return $ String contents
 
-parseBool :: Parser TPLValue
-parseBool = try (do spaces
-                    str <- string "true" <|> string "false"
-                    spaces
-                    return $ Boolean $ str == "true")
+bool :: Parser TPLValue
+bool = try (do spaces
+               str <- string "true" <|> string "false"
+               spaces
+               return $ Boolean $ str == "true")
                
-parseId :: Parser TPLValue
-parseId = do head <- letter <|> char '_'
-             contents <- many $ letter <|> digit <|> oneOf "_!?"
-             return $ Id $ head:contents
+identifier :: Parser TPLValue
+identifier = do head <- letter <|> char '_'
+                contents <- many $ letter <|> digit <|> oneOf "_!?"
+                return $ Id $ head:contents
 
-parseOperator :: Parser TPLValue
-parseOperator = many1 (oneOf "+-=*&^%$#@!?/.|~<>:") >>= return . Operator
+operator :: Parser TPLValue
+operator = fmap Operator $ many1 (oneOf "+-=*&^%$#@!?/.|~<>:") 
 
-parseNumber :: Parser TPLValue
-parseNumber = many1 digit >>= return . Number . read
+number :: Parser TPLValue
+number = fmap (Number . read) $ many1 digit
 
-parseList :: Parser TPLValue
-parseList = between (char '[') (char ']')
-            (parseExpression `sepBy` (spaces >> char ',')) >>= return . List
+list :: Parser TPLValue
+list = fmap List $ between (char '[') (char ']')
+            (expression `sepBy` (spaces >> char ','))
 
-parseLambda :: Parser TPLValue
-parseLambda = do oneOf "\\λ"
-                 parameters <- many id
-                 string "->"
-                 body <- parseExpression
-                 return $ Function parameters body
-  where id = do id <- spaces >> parseId
+lambda :: Parser TPLValue
+lambda = do oneOf "\\λ"
+            parameters <- many id
+            string "->"
+            body <- optBlock
+            return $ Function parameters body
+  where id = do id <- spaces >> identifier
                 spaces >> return id
              
-parseExpression :: Parser TPLValue
-parseExpression = many parseTPL >>= return . Expression
+expression :: Parser TPLValue
+expression = fmap Expression $ many parseTPL
 
-parseIf :: Parser TPLValue
-parseIf = try $ do spaces >> string "if" >> spaces
-                   condition <- parseParenExp
-                   spaces >> char '{' >> spaces
-                   consequent <- many1 parseTPL
-                   spaces >> char '}' >> spaces
-                   return $ If condition (Expression consequent) Null
+block :: Parser TPLValue
+block = do spaces >> char '{' >> spaces
+           statements <- many parseTPL
+           spaces >> char '}' >> spaces
+           return $ Expression statements
 
-parseElse :: Parser TPLValue
-parseElse = try $ do spaces >> string "else" >> spaces
-                     char '{' >> spaces
-                     alternate <- many1 parseTPL
-                     spaces >> char '}' >> spaces
-                     return $ Expression alternate
+optBlock :: Parser TPLValue
+optBlock = try block <|> expression
 
-parseIfElse :: Parser TPLValue
-parseIfElse = try $ do ifPart <- parseIf
-                       elsePart <- parseElse
-                       return $ append ifPart elsePart
+ifStatement :: Parser TPLValue
+ifStatement = try $ do spaces >> string "if" >> spaces
+                       condition <- parenExp
+                       consequent <- optBlock
+                       return $ If condition consequent Null
+
+elseStatement :: Parser TPLValue
+elseStatement = try $ do spaces >> string "else" >> spaces
+                         alternate <- optBlock
+                         return $ alternate
+
+ifElse :: Parser TPLValue
+ifElse = try $ do ifPart <- ifStatement
+                  elsePart <- elseStatement
+                  return $ append ifPart elsePart
   where append (If condition consequent _) alternate = 
           If condition consequent alternate
 
-parseParenExp :: Parser TPLValue
-parseParenExp = between (char '(') (char ')') parseExpression
+parenExp :: Parser TPLValue
+parenExp = between (char '(') (char ')') expression
 
 parseTPL :: Parser TPLValue
-parseTPL = spaces >> (parseLambda
-                  <|> parseIfElse
-                  <|> parseIf
-                  <|> parseBool
-                  <|> parseId
-                  <|> parseString
-                  <|> parseNumber
-                  <|> parseOperator
-                  <|> parseList
-                  <|> parseParenExp)
+parseTPL = do spaces
+              expression <- lambda
+                       <|> ifElse
+                       <|> ifStatement
+                       <|> bool
+                       <|> identifier
+                       <|> stringLiteral
+                       <|> number
+                       <|> operator
+                       <|> list
+                       <|> parenExp
+                       <|> block
+              spaces
+              return expression
 
-parseExpressions :: Parser [TPLValue]
-parseExpressions = parseExpression `sepBy` oneOf ";\n"
+expressions :: Parser [TPLValue]
+expressions = expression `sepBy` oneOf ";\n"
 
 readExp :: String -> ThrowsError TPLValue
-readExp exp = case parse parseExpressions "TPL" exp of
+readExp exp = case parse expressions "TPL" exp of
   Left err -> throwError $ Parser err
   Right val -> return $ Expression val
 
@@ -236,9 +248,9 @@ squash val = val
 
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
-  foldl1 (.) handleAll (return exp) >>= return . squash . Expression
+  fmap (squash . Expression) $ foldl1 (.) handleAll $ return $ exp
   where
-    handleAll = map (flip (>>=) . handle) operatorPrecedences
+    handleAll = map (flip (>>=) . (handle)) operatorPrecedences
     handle _ [] = return []
     handle _ [(Operator op)] = throwError $ MissingOperand op
     handle _ [a] = return [a]
@@ -252,8 +264,8 @@ handleInfix (Expression exp) =
     handle precedence vals@(left : op@(Operator opStr) : right : more)
       | precedenceOf opStr == precedence =
         handle precedence $ Expression [left, op, right] : more
-      | otherwise = handle precedence (op:right:more) >>= return . (left:)
-    handle precedence (left:more) = handle precedence more >>= return . (left:)
+      | otherwise = fmap (left:) $ handle precedence (op:right:more)
+    handle precedence (left:more) = fmap (left:) $ handle precedence more
 handleInfix value = return value
 
 eagerLeft :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
@@ -335,7 +347,7 @@ readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
 
 evalString :: Env -> String -> IO String
 evalString env exp = runIOThrows $ liftM show $ 
-                     (liftThrows $ readExp exp >>= return . squash) >>= eval env
+                     (fmap squash $ liftThrows $ readExp exp) >>= eval env
 evalAndPrint :: Env -> String -> IO ()
 evalAndPrint env exp = evalString env exp >>= putStrLn
 
@@ -346,5 +358,16 @@ until_ pred prompt action =
        then return ()
        else action result >> until_ pred prompt action
 
+repl :: IO ()
+repl = nullEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint 
+
+runFile :: FilePath -> IO ()
+runFile path = do code <- readFile path
+                  nullEnv >>= flip evalAndPrint code
+
 main :: IO ()
-main = nullEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint
+main = do args <- getArgs
+          case length args of
+            0 -> repl
+            1 -> runFile $ args !! 0
+            otherwise -> putStrLn "Too many arguments!"
