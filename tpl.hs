@@ -18,6 +18,7 @@ data TPLValue = Null
               | Operator String
               | List [TPLValue]
               | Expression [TPLValue]
+              | Sequence [TPLValue]
               | Function [TPLValue] TPLValue
               | If TPLValue TPLValue TPLValue
 
@@ -121,14 +122,14 @@ whiteSpace :: CharParser st ()
 whiteSpace = spaces
 
 terminator :: CharParser st Char
-terminator = oneOf ";\n"
+terminator = oneOf ";"
 
 lexeme :: CharParser st a -> CharParser st a
 lexeme p = do res <- p
               whiteSpace
               return res
 
-idChar = letter <|> digit <|> oneOf "_!?"
+idChar = letter <|> digit <|> oneOf "_"
 
 keyWord :: String -> CharParser st String
 keyWord str = do str <- try . lexeme $ string str
@@ -171,24 +172,22 @@ list :: Parser TPLValue
 list = fmap List $ between (char '[') (char ']') $
        expression `sepBy` char ','
 
-parameterList :: Parser [TPLValue]
-parameterList = do whiteSpace
-                   many $ lexeme identifier
-
 lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
             parameters <- parameterList
             lexeme $ string "->"
             body <- optBlock
             return $ Function parameters body
+  where parameterList = do whiteSpace
+                           many $ lexeme identifier
 
 expression :: Parser TPLValue
-expression = fmap Expression $ many atom
+expression = fmap Expression $ many1 atom
 
 block :: Parser TPLValue
-block = fmap Expression $
+block = fmap Sequence $
         between (char '{') (char '}') $
-        expression `sepEndBy` terminator
+        expression `sepEndBy` lexeme terminator
 
 optBlock :: Parser TPLValue
 optBlock = lexeme (try block <|> expression)
@@ -225,13 +224,13 @@ atom = lexeme token
             <|> parenExp
             <|> block
 
-expressions :: Parser [TPLValue]
-expressions = expression `sepBy` oneOf ";\n"
+expressions :: Parser TPLValue
+expressions = fmap Sequence $ expression `sepEndBy` lexeme terminator
 
 readExp :: String -> ThrowsError TPLValue
 readExp exp = case parse expressions "TPL" exp of
   Left err -> throwError $ Parser err
-  Right val -> return $ Expression val
+  Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
 eval env (If (Boolean condition) consequent alternate) = 
@@ -242,6 +241,7 @@ eval env (If condition consequent alternate) =
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
 eval env (List vals) = liftM List $ mapM (eval env) vals
+eval env (Sequence vals) = liftM (Expression . return . last) $ mapM (eval env) vals
 eval env val = return val
 
 evalExp :: Env -> TPLValue -> IOThrowsError TPLValue
