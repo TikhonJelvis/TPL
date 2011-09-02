@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Main where
 
 import Control.Monad.Error
@@ -29,12 +30,13 @@ showSeq vals = foldl1 ((++) . (++ " ")) $ map show vals
 instance Show TPLValue where
   show (Null) = "null"
   show (Id id) = id
-  show (String str) = "\"" ++ str ++ "\""
+  show (String str) = str
   show (Number int) = show int
   show (Operator name) = name
-  show (Boolean bool) = "#<" ++ show bool ++ ">"
+  show (Boolean bool) = show bool
   show (List vals) = show vals
-  show (Expression vals) = "<" ++ showSeq vals ++ ">"
+  show (Expression vals) = showSeq vals
+  show (Sequence vals) = unlines $ map show vals
   show (Function params body) =
     "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
   show (If condition consequent alternate) = "{?if " ++ show condition ++
@@ -170,7 +172,7 @@ operator = fmap Operator $ many1 (oneOf "+-=*&^%$#@!?/.|~<>:")
 
 list :: Parser TPLValue
 list = fmap List $ between (char '[') (char ']') $
-       expression `sepBy` char ','
+       expression `sepBy` (char ',' >> spaces)
 
 lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
@@ -240,18 +242,16 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
+  where evalExp env (Expression [a, (Operator op), b]) = (operate op) env a b
+        evalExp env (Expression (id@(Id _) : rest)) = 
+          do res <- eval env id
+             evalExp env $ Expression (res : rest)
+        evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
+        evalExp env val = eval env val
 eval env (List vals) = liftM List $ mapM (eval env) vals
 eval env (Sequence vals) = liftM (Expression . return . last) $ mapM (eval env) vals
 eval env val = return val
-
-evalExp :: Env -> TPLValue -> IOThrowsError TPLValue
-evalExp env (Expression [a, (Operator op), b]) = (operate op) env a b
-evalExp env (Expression (id@(Id _) : rest)) = 
-  do res <- eval env id
-     evalExp env $ Expression (res : rest)
-evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
-evalExp env val = eval env val
-
+  
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env (Function params body) args = 
   do args <- mapM (eval env) args
@@ -265,23 +265,23 @@ squash val = val
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
   fmap (squash . Expression) $ foldl1 (.) handleAll $ return $ exp
-  where
-    handleAll = map (flip (>>=) . (handle)) operatorPrecedences
-    handle _ [] = return []
-    handle _ [(Operator op)] = throwError $ MissingOperand op
-    handle _ [a] = return [a]
-    handle precedence exp@[left, (Operator op)]
-      | precedenceOf op == precedence = throwError $ MissingOperand op
-      | otherwise = return exp
-    handle precedence exp@[(Operator op), right]
-      | precedenceOf op == precedence = throwError $ MissingOperand op
-      | otherwise = return exp
-    handle _ [a, b] = return [a, b]
-    handle precedence vals@(left : op@(Operator opStr) : right : more)
-      | precedenceOf opStr == precedence =
-        handle precedence $ Expression [left, op, right] : more
-      | otherwise = fmap (left:) $ handle precedence (op:right:more)
-    handle precedence (left:more) = fmap (left:) $ handle precedence more
+  where handleAll = map (flip (>>=) . (handle)) operatorPrecedences
+        handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
+        handle _ [] = return []
+        handle _ [(Operator op)] = throwError $ MissingOperand op
+        handle _ [a] = return [a]
+        handle precedence exp@[left, (Operator op)]
+          | precedenceOf op == precedence = throwError $ MissingOperand op
+          | otherwise = return exp
+        handle precedence exp@[(Operator op), right]
+          | precedenceOf op == precedence = throwError $ MissingOperand op
+          | otherwise = return exp
+        handle _ [a, b] = return [a, b]
+        handle precedence vals@(left : op@(Operator opStr) : right : more)
+          | precedenceOf opStr == precedence =
+            handle precedence $ (Expression [left, op, right]) : more
+          | otherwise = fmap (left:) $ handle precedence (op:right:more)
+        handle precedence (left:more) = fmap (left:) $ handle precedence more
 handleInfix value = return value
 
 eagerLeft :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
@@ -314,28 +314,54 @@ operatorPrecedence = [("+", 5), ("-", 5),
                       ("=", 10)]
 
 operate :: String -> Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-operate op env left right =
-  maybe (liftThrows $ throwError $ BadOp op) 
-        (\ fn -> fn env left right)
-        (lookup op operators)
+operate op env left right = case (lookup op operators) of
+  Just fn -> fn env left right
+  Nothing -> liftThrows $ throwError $ BadOp op
+
+-- Type coercion:
+type TPLOperation = (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+type Coercer = (TPLValue -> ThrowsError TPLValue)
+
+-- Takes a function on TPLValues and makes it coerce to the given type.
+class Extractable a where extract :: TPLValue -> ThrowsError a
+class Packable a where pack :: a -> TPLValue
+  
+instance Extractable Int where
+  extract (Number n) = return n
+  extract num = do n <- toNumber num
+                   extract n
+instance Packable Int where pack = Number
+                            
+instance Extractable [Char] where extract = return . show
+instance Packable [Char] where pack = String
+
+liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
+liftOp op = \ env a b ->
+  do av <- liftThrows $ extract a
+     bv <- liftThrows $ extract b
+     return $ pack $ op av bv
+                       
+                       
+coercable :: TPLOperation -> Coercer -> Coercer -> TPLOperation
+coercable fn coerce1 coerce2 env arg1 arg2 = do val1 <- liftThrows $ coerce1 arg1
+                                                val2 <- liftThrows $ coerce2 arg2
+                                                fn env val1 val2
 
 toNumber :: TPLValue -> ThrowsError TPLValue
 toNumber num@(Number _) = return num
 toNumber (String str) = return $ Number $ read str
-toNumber val = throwError $ TypeMismatch "Number" (show val)
+toNumber (List []) = throwError $ TypeMismatch "Number" (show $ List [])
+toNumber (List (val:_)) = toNumber val
+toNumber val = throwError $ TypeMismatch "Number" $ show val
 
-numericBinOp :: (Int -> Int -> Int) ->
-                (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-numericBinOp op _ (Number l) (Number r) = liftThrows $ return $ Number $ op l r
-numericBinOp op env (String str) r = numericBinOp op env (Number (read str)) r
-numericBinOp op env l (String str) = numericBinOp op env l $ Number $ read str
-numericBinOp op _ l (Number _) = liftThrows $ throwError $ TypeMismatch "Number" (show l)
-numericBinOp op _ (Number _) r = liftThrows $ throwError $ TypeMismatch "Number" (show r)
+toString :: TPLValue -> ThrowsError TPLValue
+toString = (fmap String) . extract
 
-strBinOp :: (String -> String -> String) ->
-            (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-strBinOp op _ left right = 
-  liftThrows $ return $ String $ op (show left) (show right)
+numericBinOp :: (Int -> Int -> Int) -> TPLOperation
+numericBinOp op = coercable (liftOp op) toNumber toNumber
+
+strBinOp :: (String -> String -> String) -> TPLOperation
+strBinOp op = coercable (liftOp op) toString toString
 
 cons :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 cons env head (List tail) = return $ List $ head : tail
