@@ -1,13 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 module TPL.Run where
 
+import Control.Applicative
 import Control.Monad.Error
 
 import Data.IORef
 import Data.List
 import Data.Maybe
-
-import Debug.Trace
 
 import System.Environment
 import System.IO
@@ -65,38 +64,32 @@ existsVar env name = liftM (maybe False (const True) . lookup name) $
                      readIORef env
 
 getVar :: Env -> String -> IOThrowsError TPLValue
-getVar env name = 
-  do env <- liftIO $ readIORef env
-     maybe (throwError $ UndefinedVariable name)
-           (liftIO . readIORef)
-           (lookup name env)
+getVar env name = do env <- liftIO $ readIORef env
+                     case lookup name env of
+                       Just ref -> liftIO $ readIORef ref
+                       Nothing  -> throwError $ UndefinedVariable name
        
-setVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-setVar env (Id name) val = 
-  do env <- liftIO $ readIORef env
-     maybe (throwError $ UndefinedVariable name)
-           (liftIO . (`writeIORef` val))
-           (lookup name env)
-     return val
+setVar :: Env -> TPLValue -> TPLValue -> IOThrowsError ()
+setVar env (Id name) val = do env <- liftIO $ readIORef env
+                              case lookup name env of
+                                Just ref -> liftIO $ writeIORef ref val
+                                Nothing  -> throwError $ UndefinedVariable name
 
 defineVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-defineVar env id@(Id name) val = 
-  do exists <- liftIO $ existsVar env name
-     if exists then setVar env id val >> return val
-       else liftIO $ do valContents <- newIORef val
-                        envContents <- readIORef env
-                        writeIORef env $ (name, valContents) : envContents
-                        return val
+defineVar env id@(Id name) val = liftIO (existsVar env name) >>= define >> return val
+  where define True  = setVar env id val
+        define False = liftIO $ do value   <- newIORef val
+                                   currEnv <- readIORef env
+                                   writeIORef env $ (name, value) : currEnv 
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
-  where extend bindings env = liftM (++ env) (mapM addBinding bindings)
-        addBinding (name, val) = do ref <- newIORef val
-                                    return (name, ref)
-
+  where extend bindings env = liftM (++ env) $ mapM addBinding bindings
+        addBinding (name, val) = newIORef val >>= \ ref -> return (name, ref)
+                                 
 readExp :: String -> ThrowsError TPLValue
 readExp exp = case parse expressions "TPL" exp of
-  Left err -> throwError $ Parser err
+  Left err  -> throwError $ Parser err
   Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
@@ -108,20 +101,17 @@ eval env (If condition consequent alternate) =
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where evalExp env (Expression [a, (Operator op), b]) = (operate op) env a b
-        evalExp env (Expression (id@(Id _) : rest)) = 
-          do res <- eval env id
-             evalExp env $ Expression (res : rest)
+        evalExp env (Expression (id@(Id _) : rest)) = do res <- eval env id
+                                                         evalExp env $ Expression (res : rest)
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
         evalExp env val = eval env val
-eval env (List vals) = liftM List $ mapM (eval env) vals
-eval env (Sequence vals) = liftM (Expression . return . last) $ mapM (eval env) vals
-eval env val = return val
+eval env (List vals)     = List <$> mapM (eval env) vals
+eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
+eval env val             = return val
   
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env (Function params body) args = 
-  do args <- mapM (eval env) args
-     newEnv <- liftIO $ bindVars env $ zip (map show params) args
-     eval newEnv body
+  mapM (eval env) args >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
 
 squash :: TPLValue -> TPLValue
 squash (Expression [val]) = val
@@ -129,8 +119,8 @@ squash val = val
 
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
-  fmap (squash . Expression) $ foldl1 (.) handleAll $ return $ exp
-  where handleAll = map (flip (>>=) . (handle)) operatorPrecedences
+  squash . Expression <$> (foldl1 (.) handleAll $ return exp)
+  where handleAll = map ((=<<) . handle) operatorPrecedences
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
         handle _ [] = return []
         handle _ [(Operator op)] = throwError $ MissingOperand op
@@ -165,6 +155,7 @@ operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)),
              ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div), 
              ("><", eager $ strBinOp (++)),                                    
              ("==", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
+             ("|", eager $ boolOp (||)), ("&", eager $ boolOp (&&)),
              (":", eager cons), ("!!", eager index), ("..", eager range),
              ("=", eagerRight defineVar)]
 
@@ -174,7 +165,7 @@ precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
-                      ("==", 8), ("!=", 8), 
+                      ("==", 7), ("!=", 7), ("|", 6), ("&", 6),
                       (":", 9), ("!!", 9), ("..", 9),
                       ("=", 10)]
 
@@ -244,6 +235,10 @@ boolBinOp :: (String -> String -> Bool) ->
              (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
 boolBinOp op _ left right = 
   liftThrows $ return $ Boolean $ op (show left) (show right)
+  
+boolOp :: (Bool -> Bool -> Bool) ->
+          (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+boolOp op _ (Boolean left) (Boolean right) = liftThrows . return . Boolean $ op left right
 
 unpack :: ThrowsError TPLValue -> TPLValue
 unpack (Right val) = val
