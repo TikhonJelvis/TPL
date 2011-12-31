@@ -14,22 +14,21 @@ data TPLValue = Null
               | Expression [TPLValue]
               | Sequence [TPLValue]
               | Function [TPLValue] TPLValue
+              | Native String
               | If TPLValue TPLValue TPLValue
 
-showSeq :: [TPLValue] -> String
-showSeq []   = ""
 showSeq vals = intercalate " " $ map show vals
 
 instance Show TPLValue where
-  show (Null) = "null"
-  show (Id id) = id
-  show (String str) = str
-  show (Number int) = show int
-  show (Operator name) = name
-  show (Boolean bool) = show bool
-  show (List vals) = show vals
-  show (Expression vals) = showSeq vals
-  show (Sequence vals) = unlines $ map show vals
+  show (Null)                 = "null"
+  show (Id id)                = id
+  show (String str)           = show str
+  show (Number int)           = show int
+  show (Operator name)        = name
+  show (Boolean bool)         = if bool then "true" else "false"
+  show (List vals)            = show vals
+  show (Expression vals)      = showSeq vals
+  show (Sequence vals)        = unlines $ map show vals
   show (Function params body) =
     "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
   show (If condition consequent alternate) = "{?if " ++ show condition ++
@@ -43,9 +42,7 @@ terminator :: CharParser st Char
 terminator = oneOf ";"
 
 lexeme :: CharParser st a -> CharParser st a
-lexeme p = do res <- p
-              whiteSpace
-              return res
+lexeme = (>>= \ res -> whiteSpace >> return res)
 
 idChar = letter <|> digit <|> oneOf "_"
 
@@ -89,7 +86,7 @@ lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
             parameters <- parameterList
             lexeme $ string "->"
-            body <- optBlock
+            body <- expression
             return $ Function parameters body
   where parameterList = whiteSpace >> many (lexeme identifier)
 
@@ -99,22 +96,19 @@ expression = Expression <$> many1 atom
 block :: Parser TPLValue
 block = Sequence <$> between (char '{') (char '}') (expression `sepEndBy` lexeme terminator)
 
-optBlock :: Parser TPLValue
-optBlock = lexeme $ try block <|> expression
-
 ifStatement :: Parser TPLValue
 ifStatement = try $ do keyWord "if"
                        condition <- lexeme parenExp
                        (consequent, alternate) <- try blockElse <|> try expElse <|> ifOptBlock
                        return $ If condition consequent alternate
-  where ifOptBlock = do body <- optBlock
+  where ifOptBlock = do body <- expression
                         return (body, Null)
         blockElse  = do consequent <- block
                         keyWord "else"
-                        alternate <- optBlock
+                        alternate <- expression
                         return (consequent, alternate)
         expElse    = do consequent <- lexeme $ manyTill atom (try $ string "else")
-                        alternate <- optBlock
+                        alternate <- expression
                         return (Expression consequent, alternate)
         
 

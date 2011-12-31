@@ -24,13 +24,12 @@ data TPLError = Parser ParseError
               | Default String
 
 showTPLE :: TPLError -> String
-showTPLE (Parser err) = show err
-showTPLE (BadOp op) = "Unknown operator " ++ op
-showTPLE (Default str) = str
-showTPLE (TypeMismatch expected got) = "Wrong type to operator. Expected " ++
-                                       expected ++ "; got " ++ got
-showTPLE (MissingOperand op) = "Missing operand for " ++ op
-showTPLE (UndefinedVariable var) = "Variable " ++ var ++ " is undefined"
+showTPLE (Parser err)                = show err
+showTPLE (BadOp op)                  = "Unknown operator " ++ op
+showTPLE (Default str)               = str
+showTPLE (TypeMismatch expected got) = "Wrong type. Expected " ++ expected ++ "; got " ++ got ++ "."
+showTPLE (MissingOperand op)         = "Missing operand for " ++ op
+showTPLE (UndefinedVariable var)     = "Variable " ++ var ++ " is undefined"
 
 instance Show TPLError where
   show err = "Error: " ++ showTPLE err ++ "."
@@ -41,27 +40,26 @@ instance Error TPLError where
 type ThrowsError = Either TPLError
 type IOThrowsError = ErrorT TPLError IO
 
+trapError :: (MonadError e m, Show e) => m String -> m String
 trapError action = catchError action $ return . show
 
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
 liftThrows :: ThrowsError a -> IOThrowsError a
-liftThrows (Left err) = throwError err
+liftThrows (Left err)  = throwError err
 liftThrows (Right val) = return val
 
 runIOThrows :: IOThrowsError String -> IO String
-runIOThrows action = runErrorT (trapError action) >>= return . extractValue
+runIOThrows action = extractValue <$> runErrorT (trapError action)
 
 -- Variables and environments:
 type Env = IORef [(String, IORef TPLValue)]
 
-nullEnv :: IO Env
-nullEnv = newIORef []
+baseEnv = newIORef [] >>= (`bindVars` [("length", Native "length")])
 
 existsVar :: Env -> String -> IO Bool
-existsVar env name = liftM (maybe False (const True) . lookup name) $
-                     readIORef env
+existsVar env name = isJust . lookup name <$> readIORef env
 
 getVar :: Env -> String -> IOThrowsError TPLValue
 getVar env name = do env <- liftIO $ readIORef env
@@ -69,22 +67,22 @@ getVar env name = do env <- liftIO $ readIORef env
                        Just ref -> liftIO $ readIORef ref
                        Nothing  -> throwError $ UndefinedVariable name
        
-setVar :: Env -> TPLValue -> TPLValue -> IOThrowsError ()
+setVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 setVar env (Id name) val = do env <- liftIO $ readIORef env
                               case lookup name env of
-                                Just ref -> liftIO $ writeIORef ref val
+                                Just ref -> liftIO $ writeIORef ref val >> return val
                                 Nothing  -> throwError $ UndefinedVariable name
 
 defineVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 defineVar env id@(Id name) val = liftIO (existsVar env name) >>= define >> return val
-  where define True  = setVar env id val
+  where define True  = setVar env id val >> return ()
         define False = liftIO $ do value   <- newIORef val
                                    currEnv <- readIORef env
                                    writeIORef env $ (name, value) : currEnv 
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
-  where extend bindings env = liftM (++ env) $ mapM addBinding bindings
+  where extend bindings env = (++ env) <$> mapM addBinding bindings
         addBinding (name, val) = newIORef val >>= \ ref -> return (name, ref)
                                  
 readExp :: String -> ThrowsError TPLValue
@@ -100,15 +98,27 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
-  where evalExp env (Expression [a, (Operator op), b]) = (operate op) env a b
-        evalExp env (Expression (id@(Id _) : rest)) = do res <- eval env id
-                                                         evalExp env $ Expression (res : rest)
+  where evalExp env (Expression [a, (Operator op), b])      = (operate op) env a b
+        evalExp env (Expression (id@(Id name) : rest))      = do res <- eval env id
+                                                                 evalExp env $ Expression (res : rest)
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
-        evalExp env val = eval env val
+        evalExp env (Expression ((Native name) : args))     = native env name args
+        evalExp env val                                     = eval env val
 eval env (List vals)     = List <$> mapM (eval env) vals
 eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
 eval env val             = return val
+
+native :: Env -> String -> [TPLValue] -> IOThrowsError TPLValue
+native env name args = case lookup name natives of
+  Just fn -> fn env args
+  Nothing -> throwError $ UndefinedVariable ("Native: " ++ name)
   
+natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
+natives = [("length", len)]
+
+len _ [(List ls)] = return . Number $ length ls
+len _ _           = return $ Number 1
+
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env (Function params body) args = 
   mapM (eval env) args >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
@@ -154,10 +164,10 @@ eager = eagerLeft . eagerRight
 operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)), 
              ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div), 
              ("><", eager $ strBinOp (++)),                                    
-             ("==", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
+             ("=", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
              ("|", eager $ boolOp (||)), ("&", eager $ boolOp (&&)),
              (":", eager cons), ("!!", eager index), ("..", eager range),
-             ("=", eagerRight defineVar)]
+             (":=", eagerRight defineVar), ("<-", eagerRight setVar)]
 
 precedenceOf :: String -> Int
 precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
@@ -165,9 +175,9 @@ precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
-                      ("==", 7), ("!=", 7), ("|", 6), ("&", 6),
+                      ("=", 7), ("!=", 7), ("|", 6), ("&", 6),
                       (":", 9), ("!!", 9), ("..", 9),
-                      ("=", 10)]
+                      (":=", 10), ("<-", 10)]
 
 operate :: String -> Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
 operate op env left right = case (lookup op operators) of
@@ -261,11 +271,11 @@ until_ pred prompt action =
        else action result >> until_ pred prompt action
 
 repl :: IO ()
-repl = nullEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint 
+repl = baseEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint 
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path
-                  nullEnv >>= flip evalAndPrint code
+                  baseEnv >>= flip evalAndPrint code
 
 main :: IO ()
 main = do args <- getArgs
