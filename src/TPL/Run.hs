@@ -118,7 +118,9 @@ natives = map eagerRight [(":=", defineVar), ("<-", setVar)] ++
           map eager [("length", len), ("+", numOp (+)), ("-", numOp (-)),
            ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
            ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
-           ("><", strOp (++)), (":", cons), ("!", index), ("..", range)]
+           ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
+           ("head", \ _ [(List ls)] -> return $ head ls),
+           ("tail", \ _ [(List ls)] -> return . List $ tail ls)]
   where numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
         eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
         strOp = liftOp :: (String -> String -> String) -> TPLOperation
@@ -181,7 +183,7 @@ precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
-                      ("=", 7), ("/=", 7), ("|", 6), ("&", 6),
+                      ("=", 7), ("/=", 7), ("|", 8), ("&", 8),
                       (":", 9), ("!", 9), ("..", 9),
                       (":=", 10), ("<-", 10)]
 
