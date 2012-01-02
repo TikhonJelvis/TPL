@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module TPL.Run where
-
+ 
 import Control.Applicative
 import Control.Monad.Error
 
@@ -56,7 +56,7 @@ runIOThrows action = extractValue <$> runErrorT (trapError action)
 -- Variables and environments:
 type Env = IORef [(String, IORef TPLValue)]
 
-baseEnv = newIORef [] >>= (`bindVars` [("length", Native "length")])
+baseEnv = newIORef [] >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
 
 existsVar :: Env -> String -> IO Bool
 existsVar env name = isJust . lookup name <$> readIORef env
@@ -67,15 +67,15 @@ getVar env name = do env <- liftIO $ readIORef env
                        Just ref -> liftIO $ readIORef ref
                        Nothing  -> throwError $ UndefinedVariable name
        
-setVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-setVar env (Id name) val = do env <- liftIO $ readIORef env
-                              case lookup name env of
-                                Just ref -> liftIO $ writeIORef ref val >> return val
-                                Nothing  -> throwError $ UndefinedVariable name
+setVar :: Env -> [TPLValue] -> IOThrowsError TPLValue
+setVar env [(Id name), val] = do env <- liftIO $ readIORef env
+                                 case lookup name env of
+                                   Just ref -> liftIO $ writeIORef ref val >> return val
+                                   Nothing  -> throwError $ UndefinedVariable name
 
-defineVar :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-defineVar env id@(Id name) val = liftIO (existsVar env name) >>= define >> return val
-  where define True  = setVar env id val >> return ()
+defineVar :: Env -> [TPLValue] -> IOThrowsError TPLValue
+defineVar env [id@(Id name), val] = liftIO (existsVar env name) >>= define >> return val
+  where define True  = setVar env [id, val] >> return ()
         define False = liftIO $ do value   <- newIORef val
                                    currEnv <- readIORef env
                                    writeIORef env $ (name, value) : currEnv 
@@ -98,7 +98,7 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
-  where evalExp env (Expression [a, (Operator op), b])      = (operate op) env a b
+  where evalExp env (Expression [a, (Operator op), b])      = native env op [a,b]
         evalExp env (Expression (id@(Id name) : rest))      = do res <- eval env id
                                                                  evalExp env $ Expression (res : rest)
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
@@ -111,13 +111,39 @@ eval env val             = return val
 native :: Env -> String -> [TPLValue] -> IOThrowsError TPLValue
 native env name args = case lookup name natives of
   Just fn -> fn env args
-  Nothing -> throwError $ UndefinedVariable ("Native: " ++ name)
+  Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [("length", len)]
+natives = map eagerRight [(":=", defineVar), ("<-", setVar)] ++ 
+          map eager [("length", len), ("+", numOp (+)), ("-", numOp (-)),
+           ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
+           ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
+           ("><", strOp (++)), (":", cons), ("!", index), ("..", range)]
+  where numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
+        eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
+        strOp = liftOp :: (String -> String -> String) -> TPLOperation
+        eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
+                                                               op env $ left:strict)
+        eager (name, op) = (name, \ env args -> mapM (eval env) args >>= op env)
+        
 
+len :: Env -> [TPLValue] -> IOThrowsError TPLValue
 len _ [(List ls)] = return . Number $ length ls
 len _ _           = return $ Number 1
+        
+cons :: Env -> [TPLValue] -> IOThrowsError TPLValue
+cons env [head, (List tail)] = return . List $ head : tail
+cons env [head, tail]        = return . List $ head : [tail]
+
+-- TODO: Fix this to work with the whole coercion framework...
+index :: Env -> [TPLValue] -> IOThrowsError TPLValue
+index env [(List list), (Number i)]   = return $ list !! i
+index env [(List list), (String str)] = return $ list !! read str
+index env [val, i]                    = index env [(List [val]), i]
+
+range :: Env -> [TPLValue] -> IOThrowsError TPLValue
+range env [(Number start), (Number end)] = return . List $ map Number [start..end]
+range env args = mapM (liftThrows . toNumber) args >>= range env
 
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env (Function params body) args = 
@@ -149,43 +175,18 @@ handleInfix (Expression exp) =
         handle precedence (left:more) = fmap (left:) $ handle precedence more
 handleInfix value = return value
 
-eagerLeft :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
-             (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-eagerLeft op env l r = do lVal <- eval env l
-                          op env lVal r
-                       
-eagerRight :: (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue) -> 
-              (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-eagerRight op env l r = do rVal <- eval env r
-                           op env l rVal
-                           
-eager = eagerLeft . eagerRight
-
-operators = [("+", eager $ numericBinOp (+)), ("-", eager $ numericBinOp (-)), 
-             ("*", eager $ numericBinOp (*)), ("/", eager $ numericBinOp div), 
-             ("><", eager $ strBinOp (++)),                                    
-             ("=", eager $ boolBinOp (==)), ("!=", eager $ boolBinOp (/=)),
-             ("|", eager $ boolOp (||)), ("&", eager $ boolOp (&&)),
-             (":", eager cons), ("!!", eager index), ("..", eager range),
-             (":=", eagerRight defineVar), ("<-", eagerRight setVar)]
-
 precedenceOf :: String -> Int
 precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
 
 operatorPrecedences = [10,9..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
-                      ("=", 7), ("!=", 7), ("|", 6), ("&", 6),
-                      (":", 9), ("!!", 9), ("..", 9),
+                      ("=", 7), ("/=", 7), ("|", 6), ("&", 6),
+                      (":", 9), ("!", 9), ("..", 9),
                       (":=", 10), ("<-", 10)]
 
-operate :: String -> Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-operate op env left right = case (lookup op operators) of
-  Just fn -> fn env left right
-  Nothing -> liftThrows $ throwError $ BadOp op
-
 -- Type coercion:
-type TPLOperation = (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
+type TPLOperation = (Env -> [TPLValue] -> IOThrowsError TPLValue)
 type Coercer = (TPLValue -> ThrowsError TPLValue)
 
 -- Takes a function on TPLValues and makes it coerce to the given type.
@@ -194,61 +195,37 @@ class Packable a where pack :: a -> TPLValue
   
 instance Extractable Int where
   extract (Number n) = return n
-  extract num = do n <- toNumber num
-                   extract n
+  extract num = toNumber num >>= extract
 instance Packable Int where pack = Number
                             
 instance Extractable [Char] where extract = return . show
 instance Packable [Char] where pack = String
 
+instance Extractable Bool where 
+  extract (Boolean False) = return False
+  extract _               = return True
+instance Packable Bool where pack = Boolean
+
 liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
-liftOp op = \ env a b ->
+liftOp op = \ env [a, b] ->
   do av <- liftThrows $ extract a
      bv <- liftThrows $ extract b
-     return $ pack $ op av bv
-                       
+     return . pack $ op av bv
                        
 coercable :: TPLOperation -> Coercer -> Coercer -> TPLOperation
-coercable fn coerce1 coerce2 env arg1 arg2 = do val1 <- liftThrows $ coerce1 arg1
-                                                val2 <- liftThrows $ coerce2 arg2
-                                                fn env val1 val2
+coercable fn coerce1 coerce2 env [arg1, arg2] = do val1 <- liftThrows $ coerce1 arg1
+                                                   val2 <- liftThrows $ coerce2 arg2
+                                                   fn env [val1, val2]
 
 toNumber :: TPLValue -> ThrowsError TPLValue
 toNumber num@(Number _) = return num
-toNumber (String str) = return $ Number $ read str
-toNumber (List []) = throwError $ TypeMismatch "Number" (show $ List [])
+toNumber (String str)   = return . Number $ read str
+toNumber (List [])      = throwError . TypeMismatch "Number" . show $ List []
 toNumber (List (val:_)) = toNumber val
-toNumber val = throwError $ TypeMismatch "Number" $ show val
+toNumber val            = throwError . TypeMismatch "Number" $ show val
 
 toString :: TPLValue -> ThrowsError TPLValue
-toString = (fmap String) . extract
-
-numericBinOp :: (Int -> Int -> Int) -> TPLOperation
-numericBinOp op = coercable (liftOp op) toNumber toNumber
-
-strBinOp :: (String -> String -> String) -> TPLOperation
-strBinOp op = coercable (liftOp op) toString toString
-
-cons :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-cons env head (List tail) = return $ List $ head : tail
-cons env head tail = return $ List $ head : [tail]
-
-index :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-index env (List list) (Number i) = return $ list !! i
-index env (List list) (String str) = return $ list !! read str
-index env val i = index env (List [val]) i
-
-range :: Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue
-range env (Number start) (Number end) = return $ List $ map Number [start..end]
-
-boolBinOp :: (String -> String -> Bool) ->
-             (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-boolBinOp op _ left right = 
-  liftThrows $ return $ Boolean $ op (show left) (show right)
-  
-boolOp :: (Bool -> Bool -> Bool) ->
-          (Env -> TPLValue -> TPLValue -> IOThrowsError TPLValue)
-boolOp op _ (Boolean left) (Boolean right) = liftThrows . return . Boolean $ op left right
+toString = liftM String . extract
 
 unpack :: ThrowsError TPLValue -> TPLValue
 unpack (Right val) = val
