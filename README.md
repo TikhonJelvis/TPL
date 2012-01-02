@@ -17,13 +17,11 @@ exercise. Besides, everybody want to have their own language...
 
 ## Some code:
 
-Because I figure operator precedence out in a thoroughly moronic way,
-real code needs too much parentheses. Oh well.
-
 '''
-empty := \ ls -> (length ls) = 0
-map := \ fn ls -> if (empty ls) [] else (fn (head ls)) : (map fn (tail ls))
-map {\n -> n + 1} 1..10
+empty := \ ls -> length ls = 0
+map := \ fn ls -> if (empty ls) [] else fn (head ls) : map fn (tail ls)
+succ := \ n -> n + 1
+map succ (1..10)
 
 fact := \ n -> if (n = 0) 1 else n * (fact n - 1)
 fib := \ n -> if (n = 0 | n = 1) n else (fib n - 1) + (fib n - 2)
@@ -31,7 +29,11 @@ fib := \ n -> if (n = 0 | n = 1) n else (fib n - 1) + (fib n - 2)
 n := 0
 addToN := \ num -> n <- n + num
 
-sum := \ ls -> if (empty ls) 0 else (head ls) + (sum (tail ls))
+sum := \ ls -> if (empty ls) 0 else head ls + sum (tail ls)
+
+fold := \ fn accum ls -> if (empty ls) accum else fold fn (fn accum (head ls)) (tail ls)
+add := \ a b -> a + b
+sum2 := \ ls -> fold add 0 ls
 '''
 
 Basically, `:=` defines variables while `<-` mutates them--the
