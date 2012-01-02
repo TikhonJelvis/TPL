@@ -79,6 +79,7 @@ defineVar env [id@(Id name), val] = liftIO (existsVar env name) >>= define >> re
         define False = liftIO $ do value   <- newIORef val
                                    currEnv <- readIORef env
                                    writeIORef env $ (name, value) : currEnv 
+defineVar env [(Expression (fn@(Id _):args)), body] = defineVar env [fn, Function args body]
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
@@ -98,7 +99,7 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
-  where evalExp env (Expression [a, (Operator op), b])      = native env op [a,b]
+  where evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
         evalExp env (Expression (id@(Id name) : rest))      = do res <- eval env id
                                                                  evalExp env $ Expression (res : rest)
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
@@ -119,9 +120,13 @@ natives = map eagerRight [(":=", defineVar), ("<-", setVar)] ++
            ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
            ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
            ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
-           ("head", \ _ [(List ls)] -> return $ head ls),
-           ("tail", \ _ [(List ls)] -> return . List $ tail ls)]
-  where numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
+           ("head", \ _ [ls] -> return $ tplHead ls),
+           ("tail", \ _ [ls] -> return . List $ tplTail ls)]
+  where tplHead (List ls) = head ls
+        tplHead val       = val
+        tplTail (List ls) = tail ls 
+        tplTail _         = []
+        numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
         eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
         strOp = liftOp :: (String -> String -> String) -> TPLOperation
         eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
@@ -155,10 +160,14 @@ squash :: TPLValue -> TPLValue
 squash (Expression [val]) = val
 squash val = val
 
+isOp (Operator _) = True
+isOp _            = False
+
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
-  squash . Expression <$> (foldl1 (.) handleAll $ return exp)
-  where handleAll = map ((=<<) . handle) operatorPrecedences
+  squash . Expression <$> (foldl1 (.) handleAll $ return exp')
+  where exp' = map (squash . Expression) $ groupBy (\ a b -> isOp a == isOp b) exp
+        handleAll = map ((=<<) . handle) operatorPrecedences
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
         handle _ [] = return []
         handle _ [(Operator op)] = throwError $ MissingOperand op
