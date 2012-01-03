@@ -40,6 +40,13 @@ You can define custom operators. For example, `<<` is equal to `map` in the stan
 
     ls << fn := map fn ls;
 
+You can also use "operator slices" like in Haskell:
+   
+    load 'base';
+    map (+ 2) (1..10)
+
+This code will add 2 to each of the list's items. The `+ 2` expression actually evaluates to a function in the form `λ α → α + 2`; the greek letter α is used because it cannot currently be used as a normal identifier. The opposite expression would have worked too: `2 +` results in `λ α -> 2 + α`. I suspect bad things might happen if you try to nest slices, so don't.
+
 You can also load other files. This will run those files in your current environment (so if you load a file inside a function, things from that file will only be available in *that* function!).
 
     load 'base';
