@@ -26,6 +26,7 @@ eval env (If condition consequent alternate) =
   do condVal <- eval env condition >>= liftThrows . toBool
      eval env $ If condVal consequent alternate
 eval env (Id id) = get env id
+eval env (Operator op) = get env op
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where func = return . Function [(Id "α")] 
         evalExp env (Expression [op@(Operator _), right])   = func $ (Expression [(Id "α"), op, right])
@@ -59,7 +60,6 @@ handleInfix (Expression exp) =
         handleAll = map ((=<<) . handle) operatorPrecedences
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
         handle _ [] = return []
-        handle _ [(Operator op)] = throwError $ MissingOperand op
         handle _ [a] = return [a]
         handle precedence exp@[_, (Operator _)] = return exp
         handle precedence exp@[(Operator _), _] = return exp

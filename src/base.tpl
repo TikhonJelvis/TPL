@@ -6,6 +6,8 @@ a ^ b  := if (a) not b else b;
 fn >> ls := map fn ls;
 ls << fn := fn >> ls;
 
+null := if (false) 0;
+
 empty ls := length ls = 0;
 map fn ls := if (empty ls) [] else fn (head ls) : map fn (tail ls);
 filter pred ls := 
@@ -17,3 +19,7 @@ filter pred ls :=
     filter pred (tail ls);
 fold fn accum ls := if (empty ls) accum 
                     else fold fn (fn accum (head ls)) (tail ls);
+zip l1 l2 := if (empty l1 & empty l2) []
+        else if (empty l1) map {\ n -> [null, n]} l2
+        else if (empty l2) map {\ n -> [n, null]} l1
+        else    [head l1, head l2] : zip (tail l1) (tail l2);
