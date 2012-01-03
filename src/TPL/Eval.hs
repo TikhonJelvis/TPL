@@ -27,7 +27,10 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = get env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
-  where evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
+  where func = return . Function [(Id "α")] 
+        evalExp env (Expression [op@(Operator _), right])   = func $ (Expression [(Id "α"), op, right])
+        evalExp env (Expression [left, op@(Operator _)])    = func $ (Expression [left, op, (Id "α")])
+        evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
         evalExp env (Expression ((Native name) : args))     = native env name args
         evalExp env (Expression (first : rest))             = do res <- eval env first
@@ -58,12 +61,8 @@ handleInfix (Expression exp) =
         handle _ [] = return []
         handle _ [(Operator op)] = throwError $ MissingOperand op
         handle _ [a] = return [a]
-        handle precedence exp@[left, (Operator op)]
-          | precedenceOf op == precedence = throwError $ MissingOperand op
-          | otherwise = return exp
-        handle precedence exp@[(Operator op), right]
-          | precedenceOf op == precedence = throwError $ MissingOperand op
-          | otherwise = return exp
+        handle precedence exp@[_, (Operator _)] = return exp
+        handle precedence exp@[(Operator _), _] = return exp
         handle _ [a, b] = return [a, b]
         handle precedence vals@(left : op@(Operator opStr) : right : more)
           | precedenceOf opStr == precedence =
@@ -101,28 +100,30 @@ natives = [(":=", defineOp), eagerRight ("<-", set)] ++
         tplTail (List ls) = tail ls 
         tplTail _         = []
         eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
-                                                               op env $ left:strict)
-        eager (name, op) = (name, \ env args -> mapM (eval env) args >>= op env)
+                                                               safe op env $ left:strict)
+        eager (name, op) = (name, \ env args -> mapM (eval env) args >>= safe op env)
+
+safe :: TPLOperation -> TPLOperation
+safe op = op
         
-len :: Env -> [TPLValue] -> IOThrowsError TPLValue
+len :: TPLOperation
 len _ [(List ls)] = return . Number $ length ls
 len _ _           = return $ Number 1
         
-cons :: Env -> [TPLValue] -> IOThrowsError TPLValue
+cons :: TPLOperation
 cons env [head, (List tail)] = return . List $ head : tail
 cons env [head, tail]        = return . List $ head : [tail]
 
--- TODO: Fix this to work with the whole coercion framework...
-index :: Env -> [TPLValue] -> IOThrowsError TPLValue
+index :: TPLOperation
 index env [(List list), (Number i)]   = return $ list !! i
 index env [(List list), val]          = liftThrows $ (list !!) <$> (extract <=< toNumber) val
 index env [val, i]                    = index env [(List [val]), i]
 
-range :: Env -> [TPLValue] -> IOThrowsError TPLValue
+range :: TPLOperation
 range env [(Number start), (Number end)] = return . List $ map Number [start..end]
 range env args = mapM (liftThrows . toNumber) args >>= range env
 
-load :: Env -> [TPLValue] -> IOThrowsError TPLValue
+load :: TPLOperation
 load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
                    results <- mapM (run . (++ ".tpl")) args
                    return $ case results of 
@@ -130,7 +131,7 @@ load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
                      ls -> head ls
   where run file = liftIO (readFile file) >>= liftThrows . readExp >>= eval env
 
-defineOp :: Env -> [TPLValue] -> IOThrowsError TPLValue
+defineOp :: TPLOperation
 defineOp env [(Id name), val] = eval env val >>= define env name 
 defineOp env [(Expression [left@(Id _), (Operator op), right@(Id _)]), body] =
   define env op $ Function [left, right] body
