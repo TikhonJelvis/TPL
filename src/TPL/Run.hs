@@ -205,14 +205,14 @@ handleInfix (Expression exp) =
 handleInfix value = return value
 
 precedenceOf :: String -> Int
-precedenceOf = fromMaybe 0 . (`lookup` operatorPrecedence)
+precedenceOf = fromMaybe 10 . (`lookup` operatorPrecedence)
 
-operatorPrecedences = [10,9..0]
+operatorPrecedences = [11,10..0]
 operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
                       ("=", 7), ("/=", 7), ("|", 8), ("&", 8),
                       (":", 9), ("!", 9), ("..", 9),
-                      (":=", 10), ("<-", 10)]
+                      (":=", 11), ("<-", 11)]
 
 -- Type coercion:
 type TPLOperation = (Env -> [TPLValue] -> IOThrowsError TPLValue)
