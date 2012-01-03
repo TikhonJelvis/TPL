@@ -1,5 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
-module TPL.Coerce (liftOp, numOp, eqOp, strOp, toBool, toNumber, toString, extract, pack) where
+module TPL.Coerce (TPLOperation, 
+                   liftOp, numOp, eqOp, strOp, 
+                   toBool, toNumber, toString, 
+                   extract, pack) 
+       where
 
 import Control.Monad.Error
 
@@ -35,11 +39,6 @@ liftOp op = \ env [a, b] ->
 numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
 eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
 strOp = liftOp :: (String -> String -> String) -> TPLOperation
-                       
-coercable :: TPLOperation -> Coercer -> Coercer -> TPLOperation
-coercable fn coerce1 coerce2 env [arg1, arg2] = do val1 <- liftThrows $ coerce1 arg1
-                                                   val2 <- liftThrows $ coerce2 arg2
-                                                   fn env [val1, val2]
 
 toNumber :: Coercer
 toNumber num@(Number _) = return num
