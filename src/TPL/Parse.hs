@@ -1,4 +1,4 @@
-module TPL.Parse (TPLValue (..), expressions) where
+module TPL.Parse (TPLValue (..), expressions, parse) where
 
 import Control.Applicative ((<$>))
 import Text.ParserCombinators.Parsec
