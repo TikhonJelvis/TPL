@@ -23,45 +23,40 @@ type Env = IORef [(String, IORef TPLValue)]
 
 baseEnv = newIORef [] >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
 
-existsVar :: Env -> String -> IO Bool
-existsVar env name = isJust . lookup name <$> readIORef env
+exists :: Env -> String -> IO Bool
+exists env name = isJust . lookup name <$> readIORef env
 
-getVar :: Env -> String -> IOThrowsError TPLValue
-getVar env name = do env <- liftIO $ readIORef env
-                     case lookup name env of
-                       Just ref -> liftIO $ readIORef ref
-                       Nothing  -> throwError $ UndefinedVariable name
+get :: Env -> String -> IOThrowsError TPLValue
+get env name = do env <- liftIO $ readIORef env
+                  case lookup name env of
+                    Just ref -> liftIO $ readIORef ref
+                    Nothing  -> throwError $ UndefinedVariable name
        
-setVar :: Env -> [TPLValue] -> IOThrowsError TPLValue
-setVar env [(Id name), val] = do env <- liftIO $ readIORef env
-                                 case lookup name env of
-                                   Just ref -> liftIO $ writeIORef ref val >> return val
-                                   Nothing  -> throwError $ UndefinedVariable name
+set :: Env -> [TPLValue] -> IOThrowsError TPLValue
+set env [(Id name), val] = do env <- liftIO $ readIORef env
+                              case lookup name env of
+                                Just ref -> liftIO $ writeIORef ref val >> return val
+                                Nothing  -> throwError $ UndefinedVariable name
 
 define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
-define env name val = do exists <- liftIO (existsVar env name)
+define env name val = do exists <- liftIO (exists env name)
                          if exists 
-                           then setVar env [(Id name), val] >> return ()
+                           then set env [(Id name), val] >> return ()
                            else liftIO $ do value   <- newIORef val
                                             currEnv <- readIORef env
                                             writeIORef env $ (name, value) : currEnv
                          return val
 
-defineVar :: Env -> [TPLValue] -> IOThrowsError TPLValue
-defineVar env [(Id name), val] = eval env val >>= define env name 
-defineVar env [(Expression [left@(Id _), (Operator op), right@(Id _)]), body] =
+defineOp :: Env -> [TPLValue] -> IOThrowsError TPLValue
+defineOp env [(Id name), val] = eval env val >>= define env name 
+defineOp env [(Expression [left@(Id _), (Operator op), right@(Id _)]), body] =
   define env op $ Function [left, right] body
-defineVar env [(Expression ((Id fn):args)), body] = define env fn $ Function args body
+defineOp env [(Expression ((Id fn):args)), body] = define env fn $ Function args body
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
   where extend bindings env = (++ env) <$> mapM addBinding bindings
         addBinding (name, val) = newIORef val >>= \ ref -> return (name, ref)
-                                 
-readExp :: String -> ThrowsError TPLValue
-readExp exp = case parse expressions "TPL" exp of
-  Left err  -> throwError $ Parser err
-  Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
 eval env (If (Boolean condition) consequent alternate) = 
@@ -71,7 +66,7 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
   where toBool b@(Boolean _) = b
         toBool val           = Boolean True
-eval env (Id id) = getVar env id
+eval env (Id id) = get env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
@@ -90,7 +85,7 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [(":=", defineVar), eagerRight ("<-", setVar)] ++ 
+natives = [(":=", defineOp), eagerRight ("<-", set)] ++ 
           map eager [("length", len), ("+", numOp (+)), ("-", numOp (-)),
            ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
            ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
@@ -227,6 +222,11 @@ unpack (Left err) = String $ show err
 
 readPrompt :: String -> IO String
 readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
+                                 
+readExp :: String -> ThrowsError TPLValue
+readExp exp = case parse expressions "TPL" exp of
+  Left err  -> throwError $ Parser err
+  Right val -> return val
 
 evalString :: Env -> String -> IO String
 evalString env exp = runIOThrows . liftM show $
