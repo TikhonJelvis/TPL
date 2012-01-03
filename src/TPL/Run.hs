@@ -5,6 +5,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.Error
 
+import Data.Function
 import Data.IORef
 import Data.List
 import Data.Maybe
@@ -14,45 +15,8 @@ import System.IO
 
 import Text.ParserCombinators.Parsec hiding (State)
 
+import TPL.Error
 import TPL.Parse
-
--- Errors:
-data TPLError = Parser ParseError
-              | BadOp String
-              | MissingOperand String
-              | TypeMismatch String String
-              | UndefinedVariable String
-              | Default String
-
-showTPLE :: TPLError -> String
-showTPLE (Parser err)                = show err
-showTPLE (BadOp op)                  = "Unknown operator " ++ op
-showTPLE (Default str)               = str
-showTPLE (TypeMismatch expected got) = "Wrong type. Expected " ++ expected ++ "; got " ++ got ++ "."
-showTPLE (MissingOperand op)         = "Missing operand for " ++ op
-showTPLE (UndefinedVariable var)     = "Variable " ++ var ++ " is undefined"
-
-instance Show TPLError where
-  show err = "Error: " ++ showTPLE err ++ "."
-instance Error TPLError where
-  noMsg = Default "An error has occured!"
-  strMsg = Default
-
-type ThrowsError = Either TPLError
-type IOThrowsError = ErrorT TPLError IO
-
-trapError :: (MonadError e m, Show e) => m String -> m String
-trapError action = catchError action $ return . show
-
-extractValue :: ThrowsError a -> a
-extractValue (Right val) = val
-
-liftThrows :: ThrowsError a -> IOThrowsError a
-liftThrows (Left err)  = throwError err
-liftThrows (Right val) = return val
-
-runIOThrows :: IOThrowsError String -> IO String
-runIOThrows action = extractValue <$> runErrorT (trapError action)
 
 -- Variables and environments:
 type Env = IORef [(String, IORef TPLValue)]
@@ -119,6 +83,7 @@ eval env (List vals)     = List <$> mapM (eval env) vals
 eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
 eval env val             = return val
 
+-- Native functions:
 native :: Env -> String -> [TPLValue] -> IOThrowsError TPLValue
 native env name args = case lookup name natives of
   Just fn -> fn env args
@@ -176,7 +141,7 @@ apply env (Function params body) args =
 squash :: TPLValue -> TPLValue
 squash (Expression [val]) = val
 squash (Sequence [val])   = val
-squash val = val
+squash val                = val
 
 isOp (Operator _) = True
 isOp _            = False
@@ -184,7 +149,7 @@ isOp _            = False
 handleInfix :: TPLValue -> ThrowsError TPLValue
 handleInfix (Expression exp) =
   squash . Expression <$> (foldl1 (.) handleAll $ return exp')
-  where exp' = map (squash . Expression) $ groupBy (\ a b -> isOp a == isOp b) exp
+  where exp' = map (squash . Expression) $ groupBy ((==) `on` isOp) exp
         handleAll = map ((=<<) . handle) operatorPrecedences
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
         handle _ [] = return []
