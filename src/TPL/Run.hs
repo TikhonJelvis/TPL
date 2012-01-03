@@ -2,6 +2,7 @@
 module TPL.Run where
  
 import Control.Applicative
+import Control.Arrow
 import Control.Monad.Error
 
 import Data.IORef
@@ -73,13 +74,20 @@ setVar env [(Id name), val] = do env <- liftIO $ readIORef env
                                    Just ref -> liftIO $ writeIORef ref val >> return val
                                    Nothing  -> throwError $ UndefinedVariable name
 
+define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
+define env name val = do exists <- liftIO (existsVar env name)
+                         if exists 
+                           then setVar env [(Id name), val] >> return ()
+                           else liftIO $ do value   <- newIORef val
+                                            currEnv <- readIORef env
+                                            writeIORef env $ (name, value) : currEnv
+                         return val
+
 defineVar :: Env -> [TPLValue] -> IOThrowsError TPLValue
-defineVar env [id@(Id name), val] = liftIO (existsVar env name) >>= define >> return val
-  where define True  = setVar env [id, val] >> return ()
-        define False = liftIO $ do value   <- newIORef val
-                                   currEnv <- readIORef env
-                                   writeIORef env $ (name, value) : currEnv 
-defineVar env [(Expression (fn@(Id _):args)), body] = defineVar env [fn, Function args body]
+defineVar env [(Id name), val] = eval env val >>= define env name 
+defineVar env [(Expression [left@(Id _), (Operator op), right@(Id _)]), body] =
+  define env op $ Function [left, right] body
+defineVar env [(Expression ((Id fn):args)), body] = define env fn $ Function args body
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
@@ -100,10 +108,10 @@ eval env (If condition consequent alternate) =
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
-        evalExp env (Expression (id@(Id name) : rest))      = do res <- eval env id
-                                                                 evalExp env $ Expression (res : rest)
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
         evalExp env (Expression ((Native name) : args))     = native env name args
+        evalExp env (Expression (first : rest))             = do res <- eval env first
+                                                                 evalExp env $ Expression (res : rest)
         evalExp env val                                     = eval env val
 eval env (List vals)     = List <$> mapM (eval env) vals
 eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
@@ -115,13 +123,13 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = map eagerRight [(":=", defineVar), ("<-", setVar)] ++ 
+natives = [(":=", defineVar), eagerRight ("<-", setVar)] ++ 
           map eager [("length", len), ("+", numOp (+)), ("-", numOp (-)),
            ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
            ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
            ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
            ("head", \ _ [ls] -> return $ tplHead ls),
-           ("tail", \ _ [ls] -> return . List $ tplTail ls)]
+           ("tail", \ _ [ls] -> return . List $ tplTail ls), ("load", load)]
   where tplHead (List ls) = head ls
         tplHead val       = val
         tplTail (List ls) = tail ls 
@@ -133,7 +141,6 @@ natives = map eagerRight [(":=", defineVar), ("<-", setVar)] ++
                                                                op env $ left:strict)
         eager (name, op) = (name, \ env args -> mapM (eval env) args >>= op env)
         
-
 len :: Env -> [TPLValue] -> IOThrowsError TPLValue
 len _ [(List ls)] = return . Number $ length ls
 len _ _           = return $ Number 1
@@ -152,12 +159,21 @@ range :: Env -> [TPLValue] -> IOThrowsError TPLValue
 range env [(Number start), (Number end)] = return . List $ map Number [start..end]
 range env args = mapM (liftThrows . toNumber) args >>= range env
 
+load :: Env -> [TPLValue] -> IOThrowsError TPLValue
+load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
+                   results <- mapM (run . (++ ".tpl")) args
+                   return $ case results of 
+                     [] -> Null
+                     ls -> head ls
+  where run file = liftIO (readFile file) >>= liftThrows . readExp >>= eval env
+
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env (Function params body) args = 
   mapM (eval env) args >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
 
 squash :: TPLValue -> TPLValue
 squash (Expression [val]) = val
+squash (Sequence [val])   = val
 squash val = val
 
 isOp (Operator _) = True
@@ -246,8 +262,9 @@ readPrompt :: String -> IO String
 readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
 
 evalString :: Env -> String -> IO String
-evalString env exp = runIOThrows $ liftM show $ 
-                     (fmap squash $ liftThrows $ readExp exp) >>= eval env
+evalString env exp = runIOThrows . liftM show $
+                     squash <$> liftThrows (readExp exp) >>= eval env
+
 evalAndPrint :: Env -> String -> IO ()
 evalAndPrint env exp = evalString env exp >>= putStrLn
 
@@ -263,11 +280,10 @@ repl = baseEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path
-                  baseEnv >>= flip evalAndPrint code
+                  baseEnv >>= (`evalAndPrint` code)
 
 main :: IO ()
 main = do args <- getArgs
-          case length args of
-            0 -> repl
-            1 -> runFile $ args !! 0
-            otherwise -> putStrLn "Too many arguments!"
+          case args of
+            [] -> repl
+            ls -> mapM_ runFile ls

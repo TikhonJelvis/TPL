@@ -11,7 +11,9 @@ terminator :: CharParser st Char
 terminator = oneOf ";"
 
 lexeme :: CharParser st a -> CharParser st a
-lexeme = (>>= \ res -> whiteSpace >> return res)
+lexeme p = do res <- p
+              whiteSpace
+              return res
 
 idChar = letter <|> digit <|> oneOf "_"
 
@@ -63,7 +65,7 @@ expression :: Parser TPLValue
 expression = Expression <$> many1 atom
 
 block :: Parser TPLValue
-block = Sequence <$> between (char '{') (char '}') (expression `sepEndBy` lexeme terminator)
+block = Sequence <$> between (lexeme $ char '{') (char '}') (expression `sepEndBy` lexeme terminator)
 
 ifStatement :: Parser TPLValue
 ifStatement = try $ do keyWord "if"
@@ -82,7 +84,7 @@ ifStatement = try $ do keyWord "if"
         
 
 parenExp :: Parser TPLValue
-parenExp = between (char '(') (char ')') expression
+parenExp = between (lexeme $ char '(') (char ')') $ expression
 
 atom :: Parser TPLValue
 atom = lexeme $ lambda
