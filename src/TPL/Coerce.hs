@@ -7,8 +7,8 @@ import TPL.Env
 import TPL.Error
 import TPL.Value
 
-type TPLOperation = (Env -> [TPLValue] -> IOThrowsError TPLValue)
-type Coercer = (TPLValue -> ThrowsError TPLValue)
+type TPLOperation = Env -> [TPLValue] -> IOThrowsError TPLValue
+type Coercer = TPLValue -> ThrowsError TPLValue
 
 -- Takes a function on TPLValues and makes it coerce to the given type.
 class Extractable a where extract :: TPLValue -> ThrowsError a

@@ -115,7 +115,7 @@ cons env [head, tail]        = return . List $ head : [tail]
 -- TODO: Fix this to work with the whole coercion framework...
 index :: Env -> [TPLValue] -> IOThrowsError TPLValue
 index env [(List list), (Number i)]   = return $ list !! i
-index env [(List list), (String str)] = return $ list !! read str
+index env [(List list), val]          = liftThrows $ (list !!) <$> (extract <=< toNumber) val
 index env [val, i]                    = index env [(List [val]), i]
 
 range :: Env -> [TPLValue] -> IOThrowsError TPLValue
