@@ -103,8 +103,10 @@ eval :: Env -> TPLValue -> IOThrowsError TPLValue
 eval env (If (Boolean condition) consequent alternate) = 
   if condition then eval env consequent else eval env alternate
 eval env (If condition consequent alternate) = 
-  do condVal <- eval env condition
+  do condVal <- toBool <$> eval env condition
      eval env $ If condVal consequent alternate
+  where toBool b@(Boolean _) = b
+        toBool val           = Boolean True
 eval env (Id id) = getVar env id
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]

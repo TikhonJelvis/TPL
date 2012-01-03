@@ -18,9 +18,9 @@ lexeme p = do res <- p
 idChar = letter <|> digit <|> oneOf "_"
 
 keyWord :: String -> CharParser st String
-keyWord str = do str <- try . lexeme $ string str
-                 notFollowedBy idChar
-                 return str
+keyWord str = lexeme $ do str <- try $ string str
+                          notFollowedBy idChar
+                          return str
 
 specChar :: CharParser st Char
 specChar = spec <$> (oneOf "\"\\nt'"
