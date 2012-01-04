@@ -35,9 +35,3 @@ repl = baseEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path
                   baseEnv >>= (`evalString` code) >>= putStrLn
-
-main :: IO ()
-main = do args <- getArgs
-          case args of
-            [] -> repl
-            ls -> mapM_ runFile ls

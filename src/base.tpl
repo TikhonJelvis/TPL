@@ -32,5 +32,6 @@ zip l1 l2 := if (not l1 & not l2) []
 
 take n ls := if (ls & n) head ls : take (n - 1) (tail ls) else [];
 drop n ls := if (ls) {if (n) drop (n - 1) $ tail ls else ls} else [];
-
 sub start end ls := take (end - start) $ drop start ls;
+
+repeat x n := if (n) x : repeat x (n - 1) else [];
