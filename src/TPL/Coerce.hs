@@ -5,6 +5,7 @@ module TPL.Coerce (TPLOperation,
                    extract, pack) 
        where
 
+import Control.Arrow
 import Control.Monad.Error
 
 import TPL.Env
@@ -27,8 +28,8 @@ instance Extractable [Char] where extract = return . show
 instance Packable [Char] where pack = String
 
 instance Extractable Bool where 
-  extract (Boolean False) = return False
-  extract _               = return True
+  extract (Boolean bool)  = return bool
+  extract val             = toBool val >>= extract
 instance Packable Bool where pack = Boolean
 
 liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
@@ -45,6 +46,7 @@ toNumber num@(Number _) = return num
 toNumber (String str)   = return . Number $ read str
 toNumber (List [])      = throwError . TypeMismatch "Number" . show $ List []
 toNumber (List (val:_)) = toNumber val
+toNumber (Boolean bool) = return . Number $ if bool then 1 else 0
 toNumber val            = throwError . TypeMismatch "Number" $ show val
 
 toString :: Coercer

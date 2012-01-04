@@ -25,7 +25,7 @@ instance Show TPLValue where
   show (Operator name)        = name
   show (Boolean bool)         = if bool then "true" else "false"
   show (List vals)            = show vals
-  show (Expression vals)      = showSeq vals
+  show (Expression vals)      = "<" ++ showSeq vals ++ ">"
   show (Sequence vals)        = unlines $ map show vals
   show (Native name)          = "[<native> " ++ name ++ "]"
   show (Function params body) =

@@ -11,6 +11,7 @@ import Data.Maybe
 import TPL.Coerce
 import TPL.Env
 import TPL.Error
+import TPL.Native
 import TPL.Parse
 import TPL.Value
 
@@ -31,7 +32,7 @@ eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where func = return . Function [(Id "α")] 
         evalExp env (Expression [op@(Operator _), right])   = func $ (Expression [(Id "α"), op, right])
         evalExp env (Expression [left, op@(Operator _)])    = func $ (Expression [left, op, (Id "α")])
-        evalExp env (Expression [a, (Operator op), b])      = evalExp env $ Expression [(Id op), a, b]
+        evalExp env (Expression [a, Operator op, b])        = evalExp env $ Expression [(Id op), a, b]
         evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
         evalExp env (Expression ((Native name) : args))     = native env name args
         evalExp env (Expression (first : rest))             = do res <- eval env first
@@ -51,8 +52,8 @@ apply env fn@(Function params body) args
                          return . Expression $ (fn : args) ++ newParams
 
 squash :: TPLValue -> TPLValue
-squash (Expression [val]) = val
-squash (Sequence [val])   = val
+squash (Expression [val]) = squash val
+squash (Sequence [val])   = squash val
 squash val                = val
 
 isOp (Operator _) = True
@@ -66,8 +67,8 @@ handleInfix (Expression exp) =
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
         handle _ [] = return []
         handle _ [a] = return [a]
-        handle precedence exp@[_, (Operator _)] = return exp
-        handle precedence exp@[(Operator _), _] = return exp
+        handle precedence exp@[_, Operator _] = return exp
+        handle precedence exp@[Operator _, _] = return exp
         handle _ [a, b] = return [a, b]
         handle precedence vals@(left : op@(Operator opStr) : right : more)
           | precedenceOf opStr == precedence =
@@ -93,40 +94,14 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [(":=", defineOp), eagerRight ("<-", set)] ++ 
-          map eager [("length", len), ("+", numOp (+)), ("-", numOp (-)),
-           ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
-           ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
-           ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
-           ("head", \ _ [ls] -> return $ tplHead ls),
-           ("tail", \ _ [ls] -> return . List $ tplTail ls), ("load", load)]
-  where tplHead (List ls) = head ls
-        tplHead val       = val
-        tplTail (List ls) = tail ls 
-        tplTail _         = []
-        eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
+natives = [(":=", defineOp), eagerRight ("<-", set), eager ("load", load)] ++ 
+          map eager eagerNatives
+  where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                safe op env $ left:strict)
-        eager (name, op) = (name, \ env args -> mapM (eval env) args >>= safe op env)
+        eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= safe op env)
 
 safe :: TPLOperation -> TPLOperation
 safe op = op
-        
-len :: TPLOperation
-len _ [(List ls)] = return . Number $ length ls
-len _ _           = return $ Number 1
-        
-cons :: TPLOperation
-cons env [head, (List tail)] = return . List $ head : tail
-cons env [head, tail]        = return . List $ head : [tail]
-
-index :: TPLOperation
-index env [(List list), (Number i)]   = return $ list !! i
-index env [(List list), val]          = liftThrows $ (list !!) <$> (extract <=< toNumber) val
-index env [val, i]                    = index env [(List [val]), i]
-
-range :: TPLOperation
-range env [(Number start), (Number end)] = return . List $ map Number [start..end]
-range env args = mapM (liftThrows . toNumber) args >>= range env
 
 load :: TPLOperation
 load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
@@ -137,10 +112,10 @@ load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
   where run file = liftIO (readFile file) >>= liftThrows . readExp >>= eval env
 
 defineOp :: TPLOperation
-defineOp env [(Id name), val] = eval env val >>= define env name 
-defineOp env [(Expression [left@(Id _), (Operator op), right@(Id _)]), body] =
+defineOp env [Id name, val] = eval env val >>= define env name 
+defineOp env [Expression [left@(Id _), Operator op, right@(Id _)], body] =
   define env op $ Function [left, right] body
-defineOp env [(Expression ((Id fn):args)), body] = define env fn $ Function args body
+defineOp env [Expression ((Id fn):args), body] = define env fn $ Function args body
 
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
 
