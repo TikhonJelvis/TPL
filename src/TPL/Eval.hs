@@ -42,8 +42,13 @@ eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
 eval env val             = return val
 
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
-apply env (Function params body) args = 
-  mapM (eval env) args >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
+apply env fn@(Function params body) args 
+  | length args < length params = Function newParams <$> newBody
+  | otherwise                   = eArgs >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
+    where eArgs = mapM (eval env) args
+          newParams = map (Id . ("α" ++) . show) [1..length params - length args]
+          newBody   = do args <- eArgs
+                         return . Expression $ (fn : args) ++ newParams
 
 squash :: TPLValue -> TPLValue
 squash (Expression [val]) = val

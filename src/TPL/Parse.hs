@@ -41,6 +41,9 @@ bool = Boolean . (== "true") <$> (keyWord "true" <|> keyWord "false")
 
 number :: Parser TPLValue
 number = Number . read <$> many1 digit <?> "number"
+
+nullExp :: Parser TPLValue
+nullExp = keyWord "null" >> return Null
                
 identifier :: Parser TPLValue
 identifier = do head     <- letter <|> char '_'
@@ -90,6 +93,7 @@ atom :: Parser TPLValue
 atom = lexeme $ lambda
             <|> ifStatement
             <|> bool
+            <|> nullExp
             <|> identifier
             <|> stringLiteral
             <|> number

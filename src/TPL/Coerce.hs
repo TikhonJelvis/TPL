@@ -52,4 +52,7 @@ toString = liftM String . extract
 
 toBool :: Coercer
 toBool b@(Boolean _) = return b
+toBool (Null)        = return $ Boolean False
+toBool (Number 0)    = return $ Boolean False
+toBool (List [])     = return $ Boolean False
 toBool val           = return $ Boolean True
