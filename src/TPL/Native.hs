@@ -4,6 +4,8 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.Error
 
+import Data.List
+
 import TPL.Coerce
 import TPL.Error
 import TPL.Value
@@ -16,7 +18,7 @@ eagerNatives = [("length", len), ("+", numOp (+)), ("-", numOp (-)),
                 ("tail", \ _ [ls] -> return $ tplTail ls), ("open", open)]
 
 len :: TPLOperation
-len _ [List ls] = return . Number $ length ls
+len _ [List ls] = return . Number $ genericLength ls
 len _ _         = return $ Number 1
         
 cons :: TPLOperation
@@ -28,10 +30,10 @@ cons env [head, List tail]          = return . List $ head : tail
 cons env [head, tail]               = return . List $ head : [tail]
 
 index :: TPLOperation
-index env [List list, Number i]  = return $ list !! i
-index env [List list, val]       = liftThrows $ (list !!) <$> (extract <=< toNumber) val
-index env [String str, Number i] = return . String $ [str !! i]
-index env [String str, val]      = liftThrows $ (String . return . (str !!)) <$> (extract <=< toNumber) val
+index env [List list, Number i]  = return $ list !! fromInteger i
+index env [List list, val]       = liftThrows $ (list !!) . fromInteger <$> (extract <=< toNumber) val
+index env [String str, Number i] = return . String $ [str !! fromInteger i]
+index env [String str, val]      = liftThrows $ (String . return . (str !!) . fromInteger) <$> (extract <=< toNumber) val
 index env [val, i]               = index env [(List [val]), i]
 
 range :: TPLOperation

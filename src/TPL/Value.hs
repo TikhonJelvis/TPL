@@ -4,7 +4,7 @@ import Data.List
 
 data TPLValue = Null
               | Id String
-              | Number Int
+              | Number Integer
               | String String
               | Boolean Bool
               | Operator String

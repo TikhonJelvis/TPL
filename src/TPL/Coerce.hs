@@ -19,10 +19,10 @@ type Coercer = TPLValue -> ThrowsError TPLValue
 class Extractable a where extract :: TPLValue -> ThrowsError a
 class Packable a where pack :: a -> TPLValue
   
-instance Extractable Int where
+instance Extractable Integer where
   extract (Number n) = return n
   extract num = toNumber num >>= extract
-instance Packable Int where pack = Number
+instance Packable Integer where pack = Number
                             
 instance Extractable [Char] where extract = return . show
 instance Packable [Char] where pack = String
@@ -37,7 +37,7 @@ liftOp op = \ env [a, b] ->
   do av <- liftThrows $ extract a
      bv <- liftThrows $ extract b
      return . pack $ op av bv
-numOp = liftOp :: (Int -> Int -> Int) -> TPLOperation
+numOp = liftOp :: (Integer -> Integer -> Integer) -> TPLOperation
 eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
 strOp = liftOp :: (String -> String -> String) -> TPLOperation
 
