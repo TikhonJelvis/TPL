@@ -13,6 +13,7 @@ import TPL.Env
 import TPL.Error
 import TPL.Native
 import TPL.Parse
+import TPL.Pattern
 import TPL.Value
 
 readExp :: String -> ThrowsError TPLValue
@@ -45,16 +46,11 @@ eval env val             = return val
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env fn@(Function params body) args 
   | length args < length params = Function newParams <$> newBody
-  | otherwise                   = eArgs >>= liftIO . bindVars env . zip (map show params) >>= (`eval` body)
+  | otherwise                   = eArgs >>= liftIO . bindVars env . unify params >>= (`eval` body)
     where eArgs = mapM (eval env) args
           newParams = map (Id . ("α" ++) . show) [1..length params - length args]
           newBody   = do args <- eArgs
                          return . Expression $ (fn : args) ++ newParams
-
-squash :: TPLValue -> TPLValue
-squash (Expression [val]) = squash val
-squash (Sequence [val])   = squash val
-squash val                = val
 
 isOp (Operator _) = True
 isOp _            = False
@@ -90,7 +86,7 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [(":=", defineOp), eagerRight ("<-", set), eager ("load", load), ("with", with)] ++ 
+natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("with", with)] ++ 
           map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                safe op env $ left:strict)
@@ -112,6 +108,19 @@ defineOp env [Id name, val] = eval env val >>= define env name
 defineOp env [Expression [left@(Id _), Operator op, right@(Id _)], body] =
   define env op $ Function [left, right] body
 defineOp env [Expression ((Id fn):args), body] = define env fn $ Function args body
+defineOp env [List vals, List body] = do mapM defPair $ unify vals body
+                                         return $ List body
+  where defPair (name, val) = define env name val
+defineOp env [List vals, body]      = defineOp env [List vals, List [body]]
+
+
+  
+setOp :: TPLOperation
+setOp env ls@[Id _, _]           = set env ls
+setOp env [List vals, List body] = do mapM setPair $ unify vals body
+                                      return $ List body
+  where setPair (name, val) = set env [Id name, val]
+setOp env [List vals, body]      = setOp env [List vals, List [body]]
 
 with :: TPLOperation
 with env [(List bindings), body] = do let vars = mapM (toBinding . squash) bindings

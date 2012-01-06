@@ -7,13 +7,13 @@ A silly little programming language that I'm working on for fun. I'm writing it 
 
 Currently the idea is for it to be simple, dynamically typed, interpreted, impure and eagerly evaluated--basically the exact opposite of Haskell.
 
-This language isn't really meant for use; it's just a fun didactic exercise. Besides, everybody want to have their own language...
+This language isn't really meant for use; it's just a fun didactic exercise. Besides, everybody wants to have their own language...
 
 ## Future Features:
 
 In the near future, I want to add:
   
-  - pattern matching (at least for lists)
+  - more extensive and useful pattern matching (not just destructuring assignment for lists).
   - better error handling and reporting
   - functions with no arguments (they can't really be called right now...)
   - more standard functions (both native and part of `base.tpl`)

@@ -23,10 +23,10 @@ get env name = do env <- liftIO $ readIORef env
                     Nothing  -> throwError $ UndefinedVariable name
        
 set :: Env -> [TPLValue] -> IOThrowsError TPLValue
-set env [(Id name), val] = do env <- liftIO $ readIORef env
-                              case lookup name env of
-                                Just ref -> liftIO $ writeIORef ref val >> return val
-                                Nothing  -> throwError $ UndefinedVariable name
+set env [Id name, val] = do env <- liftIO $ readIORef env
+                            case lookup name env of
+                              Just ref -> liftIO $ writeIORef ref val >> return val
+                              Nothing  -> throwError $ UndefinedVariable name
 
 define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
 define env name val = do exists <- liftIO (exists env name)
