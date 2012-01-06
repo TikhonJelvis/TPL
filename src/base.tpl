@@ -10,6 +10,7 @@ a % b := a - (a / b * b);
 
 fn >> ls := map fn ls;
 ls << fn := fn >> ls;
+for := (<<);
 
 map fn ls := if (not ls) [] else fn (head ls) : map fn (tail ls);
 

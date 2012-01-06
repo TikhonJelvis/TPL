@@ -65,16 +65,12 @@ handleInfix (Expression exp) =
   where exp' = map (squash . Expression) $ groupBy ((==) `on` isOp) exp
         handleAll = map ((=<<) . handle) operatorPrecedences
         handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
-        handle _ [] = return []
-        handle _ [a] = return [a]
-        handle precedence exp@[_, Operator _] = return exp
-        handle precedence exp@[Operator _, _] = return exp
-        handle _ [a, b] = return [a, b]
         handle precedence vals@(left : op@(Operator opStr) : right : more)
           | precedenceOf opStr == precedence =
             handle precedence $ (Expression [left, op, right]) : more
           | otherwise = fmap (left:) $ handle precedence (op:right:more)
         handle precedence (left:more) = fmap (left:) $ handle precedence more
+        handle precedence val         = return val
 handleInfix value = return value
 
 precedenceOf :: String -> Int
@@ -94,7 +90,7 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [(":=", defineOp), eagerRight ("<-", set), eager ("load", load)] ++ 
+natives = [(":=", defineOp), eagerRight ("<-", set), eager ("load", load), ("with", with)] ++ 
           map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                safe op env $ left:strict)
@@ -116,6 +112,14 @@ defineOp env [Id name, val] = eval env val >>= define env name
 defineOp env [Expression [left@(Id _), Operator op, right@(Id _)], body] =
   define env op $ Function [left, right] body
 defineOp env [Expression ((Id fn):args), body] = define env fn $ Function args body
+
+with :: TPLOperation
+with env [(List bindings), body] = do let vars = mapM (toBinding . squash) bindings
+                                      res <- vars >>= liftIO . bindVars env
+                                      eval res body
+  where toBinding (List [name, val]) = do val <- eval env val
+                                          return (show name, val)
+ 
 
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
 
