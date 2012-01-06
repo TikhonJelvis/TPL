@@ -12,6 +12,8 @@ fn >> ls := map fn ls;
 ls << fn := fn >> ls;
 for := (<<);
 
+head [a] := a;
+
 map fn ls := if (not ls) [] else fn (head ls) : map fn (tail ls);
 
 filter pred ls := 

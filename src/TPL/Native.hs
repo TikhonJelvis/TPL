@@ -14,13 +14,9 @@ eagerNatives = [("length", len), ("+", numOp (+)), ("-", numOp (-)),
                 ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
                 ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
-                ("head", \ _ [ls] -> return $ tplHead ls),
                 ("tail", \ _ [ls] -> return $ tplTail ls), ("open", open),
                 ("print", printTPL)]
-  where tplHead (List ls)     = head ls
-        tplHead (String str)  = String $ [head str]
-        tplHead val           = val
-        tplTail (List ls)     = List $ tail ls 
+  where tplTail (List ls)     = List $ tail ls 
         tplTail (String str)  = String $ tail str
         tplTail _             = List []
         

@@ -60,9 +60,10 @@ lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
             parameters <- parameterList
             lexeme $ string "->"
-            body <- expression
+            body       <- expression
             return $ Function parameters body
-  where parameterList = whiteSpace >> many (lexeme identifier)
+  where parameterList = whiteSpace >> many (lexeme argument)
+        argument      = identifier <|> list
 
 expression :: Parser TPLValue
 expression = Expression <$> many1 atom
