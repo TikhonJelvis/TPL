@@ -12,26 +12,23 @@ fn >> ls := map fn ls;
 ls << fn := fn >> ls;
 for := (<<);
 
+length [x, xs...] := if (x = null) 0 else 1 + length xs;
 head [a] := a;
+tail [_, xs...] := xs;
 
-map fn ls := if (not ls) [] else fn (head ls) : map fn (tail ls);
+map fn [x, xs...] := if (x = null) [] else fn x : map fn xs;
 
-filter pred ls := 
-  if (not ls) 
-    [] 
-  else if (pred $ head ls) 
-    head ls : filter pred (tail ls) 
-  else
-    filter pred (tail ls);
+filter pred [x, xs...] := if (x = null) []
+                     else if (pred x)   x : filter pred xs
+                     else               filter pred xs;
+
 
 fold fn accum ls := if (not ls) accum 
                     else fold fn (fn accum $ head ls) $ tail ls;
-fold1 fn ls := fold fn $ head ls $ tail ls;
+fold1 fn ls := fold fn (head ls) $ tail ls;
 
-zip l1 l2 := if (not l1 & not l2) []
-        else if (not l1) map (\ n -> [null, n]) l2
-        else if (not l2) map (\ n -> [n, null]) l1
-        else    [head l1, head l2] : zip $ tail l1 $ tail l2;
+zip l1 l2 := if (not l1) map (\ n -> [null, n]) l2
+           else [head l1, head l2] : zip (tail l1) (tail l2);
 
 take n ls := if (ls & n) head ls : take (n - 1) (tail ls) else [];
 drop n ls := if (ls) {if (n) drop (n - 1) $ tail ls else ls} else [];

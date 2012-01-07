@@ -6,13 +6,17 @@ unify :: [TPLValue] -> [TPLValue] -> [(String, TPLValue)]
 unify exps vals = let exps' = map squash exps
                       vals' = map squash vals in
                   zip exps' vals' >>= unifyExp
-  where unifyExp ((Id name), val)        = [(name, val)]
-        unifyExp ((List ls), (List val)) = unify ls val
-        unifyExp (ls@(List _), val)      = unifyExp (ls, (List [val]))
-        unifyRest (rest, vals) = combine $ vals >>= unify rest
+  where unifyExp ((Id name), val)          = [(name, val)]
+        unifyExp ((List ls), (List val))   = case last ls of
+          Expression [pattern, Operator "..."] -> unify (init ls) (take len val) ++ unifyRest pattern (drop len val)
+          _                                    -> unify ls val
+          where len = length $ init ls
+        unifyExp (ls@(List _), val) = unifyExp (ls, List [val])
+        unifyRest rest vals = combine $ vals >>= \ val -> unify [rest] [val]
         combine ((name, val):rest) = (name, List $ val : extract name rest) : 
                                      (combine $ filter ((/= name) . fst) rest)
-        extract name ls = map snd $ filter ((== "name") . fst) ls
+        combine []                 = []
+        extract name ls = [v | (n, v) <- ls, n == name]
           
           
 squash :: TPLValue -> TPLValue

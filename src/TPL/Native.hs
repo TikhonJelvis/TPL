@@ -10,21 +10,12 @@ import TPL.Coerce
 import TPL.Error
 import TPL.Value
 
-eagerNatives = [("length", len), ("+", numOp (+)), ("-", numOp (-)),
+eagerNatives = [("+", numOp (+)), ("-", numOp (-)),
                 ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
                 ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
-                ("tail", \ _ [ls] -> return $ tplTail ls), ("open", open),
-                ("print", printTPL)]
-  where tplTail (List ls)     = List $ tail ls 
-        tplTail (String str)  = String $ tail str
-        tplTail _             = List []
-        
+                ("open", open), ("print", printTPL)]
 
-len :: TPLOperation
-len _ [List ls] = return . Number $ genericLength ls
-len _ _         = return $ Number 1
-        
 cons :: TPLOperation
 cons _ [String head, String tail]   = return . String $ head ++ tail
 cons env [val, tail@(String _)]     = do str <- liftThrows $ toString val
