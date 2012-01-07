@@ -105,7 +105,7 @@ load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
 
 defineOp :: TPLOperation
 defineOp env [Id name, val] = eval env val >>= define env name 
-defineOp env [Expression [left@(Id _), Operator op, right@(Id _)], body] =
+defineOp env [Expression [left, Operator op, right], body] =
   define env op $ Function [left, right] body
 defineOp env [Expression ((Id fn):args), body] = define env fn $ Function args body
 defineOp env [List vals, List body] = do mapM defPair $ unify vals body

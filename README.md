@@ -47,7 +47,7 @@ You can define custom operators. For example, `<<` is equal to `map` in the stan
 You can also use "operator slices" like in Haskell:
    
     load 'base';
-    map (+ 2) (1..10)
+    map (+ 2) (1..10);
 
 This code will add 2 to each of the list's items. The `+ 2` expression actually evaluates to a function in the form `λ α → α + 2`; the greek letter α is used because it cannot currently be used as a normal identifier. The opposite expression would have worked too: `2 +` results in `λ α -> 2 + α`. I suspect bad things might happen if you try to nest slices, so don't.
 
@@ -55,22 +55,26 @@ This code will add 2 to each of the list's items. The `+ 2` expression actually 
 
 There is *very basic* pattern matching, which is really like "destructuring assignment" from JavaScript. I want to have proper pattern matching, but that comes later (if at all :)).
 
-    [a, b] := [37, 42]
-    [a, b] <- (1..10)
-    [c, d] := 1
+    [a, b] := [37, 42];
+    [a, b] <- (1..10);
+    [c, d] := 1;
 
 Note how the two size-mismatched cases are both valid. In `[a, b] <- (1..10)`, `a` is `1` and b is `2`; the rest is thrown away. In `[c, d] := 1`, `c` is 1 and `d` is not defined.
 
 You can also use these patterns in functions:
 
-    f [a, b] := a + b
-    f [1, 2]
+    f [a, b] := a + b;
+    f [1, 2];
 
-You cannot have multiple declarations of a function with different patterns yet. This is part of the "proper" pattern matching I want to add in the future.
+You cannot have multiple declarations of a function with different patterns yet. This is part of the "proper" pattern matching I want to add in the future. Maybe.
+
+You can also use these patterns when declaring an operator:
+
+    [a, b] ~ [c, d] := a * c + b * d;
 
 Finally, you can also nest these patterns:
 
-    [a, [b, c], d] := [1, [2, 3], 4]
+    [a, [b, c], d] := [1, [2, 3], 4];
 
 ### Files and IO
 
