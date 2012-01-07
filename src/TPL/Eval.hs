@@ -30,22 +30,23 @@ eval env (If condition consequent alternate) =
 eval env (Id id) = get env id
 eval env (Operator op) = get env op
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
-  where func = return . Function [(Id "α")] 
-        evalExp env (Expression [op@(Operator _), right])   = func $ (Expression [(Id "α"), op, right])
-        evalExp env (Expression [left, op@(Operator _)])    = func $ (Expression [left, op, (Id "α")])
-        evalExp env (Expression [a, Operator op, b])        = evalExp env $ Expression [(Id op), a, b]
-        evalExp env (Expression (fn@(Function _ _) : args)) = apply env fn args
-        evalExp env (Expression ((Native name) : args))     = native env name args
-        evalExp env (Expression (first : rest))             = do res <- eval env first
-                                                                 evalExp env $ Expression (res : rest)
-        evalExp env val                                     = eval env val
+  where func = return . Function (Just env) [(Id "α")] 
+        evalExp env (Expression [op@(Operator _), right])     = func $ (Expression [(Id "α"), op, right])
+        evalExp env (Expression [left, op@(Operator _)])      = func $ (Expression [left, op, (Id "α")])
+        evalExp env (Expression [a, Operator op, b])          = evalExp env $ Expression [(Id op), a, b]
+        evalExp env (Expression (fn@(Function _ _ _) : args)) = apply fn args
+        evalExp env (Expression ((Native name) : args))       = native env name args
+        evalExp env (Expression (first : rest))               = do res <- eval env first
+                                                                   evalExp env $ Expression (res : rest)
+        evalExp env val                                       = eval env val
 eval env (List vals)     = List <$> mapM (eval env) vals
 eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
+eval env (Function Nothing args body) = return $ Function (Just env) args body
 eval env val             = return val
 
-apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
-apply env fn@(Function params body) args 
-  | length args < length params = Function newParams <$> newBody
+apply :: TPLValue -> [TPLValue] -> IOThrowsError TPLValue
+apply fn@(Function (Just env) params body) args 
+  | length args < length params = Function (Just env) newParams <$> newBody
   | otherwise                   = eArgs >>= liftIO . bindVars env . unify params >>= (`eval` body)
     where eArgs = mapM (eval env) args
           newParams = map (Id . ("α" ++) . show) [1..length params - length args]
@@ -106,8 +107,8 @@ load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
 defineOp :: TPLOperation
 defineOp env [Id name, val] = eval env val >>= define env name 
 defineOp env [Expression [left, Operator op, right], body] =
-  define env op $ Function [left, right] body
-defineOp env [Expression ((Id fn):args), body] = define env fn $ Function args body
+  define env op $ Function (Just env) [left, right] body
+defineOp env [Expression ((Id fn):args), body] = define env fn $ Function (Just env) args body
 defineOp env [List vals, List body] = do mapM defPair $ unify vals body
                                          return $ List body
   where defPair (name, val) = define env name val

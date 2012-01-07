@@ -9,16 +9,12 @@ import Data.IORef
 import TPL.Error
 import TPL.Value
 
-type Env = IORef [(String, IORef TPLValue)]
-
-nullEnv = newIORef []
-
 exists :: Env -> String -> IO Bool
 exists env name = isJust . lookup name <$> readIORef env
 
 get :: Env -> String -> IOThrowsError TPLValue
 get env name = do env <- liftIO $ readIORef env
-                  case lookup name env of
+                  case lookup name env of 
                     Just ref -> liftIO $ readIORef ref
                     Nothing  -> throwError $ UndefinedVariable name
        
