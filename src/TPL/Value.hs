@@ -16,7 +16,8 @@ data TPLValue = Null
               | List [TPLValue]
               | Expression [TPLValue]
               | Sequence [TPLValue]
-              | Function (Maybe Env) [TPLValue] TPLValue 
+              | Lambda [TPLValue] TPLValue
+              | Function Env [TPLValue] TPLValue 
               | Native String
               | If TPLValue TPLValue TPLValue
                 
@@ -30,11 +31,14 @@ instance Show TPLValue where
   show (Operator name)          = name
   show (Boolean bool)           = if bool then "true" else "false"
   show (List vals)              = show vals
-  show (Expression vals)        = showSeq vals
+  show (Expression vals)        = "<" ++ showSeq vals ++ ">"
   show (Sequence vals)          = unlines $ map show vals
   show (Native name)            = "[<native> " ++ name ++ "]"
-  show (Function _ params body) =
-    "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
+  show (Function e params body) = showFun params body
+  show (Lambda params body)     = showFun params body
   show (If condition consequent alternate) = "{?if " ++ show condition ++
                                              " then " ++ show consequent ++
                                              " else " ++ show alternate ++ "?}"
+
+showFun :: [TPLValue] -> TPLValue -> String
+showFun params body = "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"

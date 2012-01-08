@@ -61,7 +61,7 @@ lambda = do oneOf "\\λ"
             parameters <- parameterList
             lexeme $ string "->"
             body       <- expression
-            return $ Function Nothing parameters body
+            return $ Lambda parameters body
   where parameterList = whiteSpace >> many (lexeme argument)
         argument      = identifier <|> list
 
