@@ -61,6 +61,22 @@ There is *very basic* pattern matching, which is really like "destructuring assi
 
 Note how the two size-mismatched cases are both valid. In `[a, b] <- (1..10)`, `a` is `1` and b is `2`; the rest is thrown away. In `[c, d] := 1`, `c` is 1 and `d` is not defined.
 
+Finally, you can also nest these patterns:
+
+    [a, [b, c], d] := [1, [2, 3], 4];
+
+You can match the rest of the list using `...`:
+
+    [x, xs...] := (1..10);
+
+Here `x = 1` and `xs = [2,3,4,5,6,7,8,9,10]`.
+
+The `...` also works on nested patterns:
+
+    [[a, b], [c, d]...] := zip (1..10) (11..20);
+
+Here `a = 1`, `b = 11`, `c = 2..10` and `d = 12..10`.
+
 You can also use these patterns in functions:
 
     f [a, b] := a + b;
@@ -68,13 +84,9 @@ You can also use these patterns in functions:
 
 You cannot have multiple declarations of a function with different patterns yet. This is part of the "proper" pattern matching I want to add in the future. Maybe.
 
-You can also use these patterns when declaring an operator:
+You can use these patterns when declaring an operator:
 
     [a, b] ~ [c, d] := a * c + b * d;
-
-Finally, you can also nest these patterns:
-
-    [a, [b, c], d] := [1, [2, 3], 4];
 
 ### Files and IO
 
