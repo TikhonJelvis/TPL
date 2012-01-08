@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module TPL.Coerce (TPLOperation, 
-                   liftOp, numOp, eqOp, strOp, 
+                   liftOp, numOp, eqOp, strOp, eqNumOp,
                    toBool, toNumber, toString, 
                    extract, pack) 
        where
@@ -37,9 +37,10 @@ liftOp op = \ env [a, b] ->
   do av <- liftThrows $ extract a
      bv <- liftThrows $ extract b
      return . pack $ op av bv
-numOp = liftOp :: (Integer -> Integer -> Integer) -> TPLOperation
-eqOp  = liftOp :: (String -> String -> Bool) -> TPLOperation
-strOp = liftOp :: (String -> String -> String) -> TPLOperation
+numOp   = liftOp :: (Integer -> Integer -> Integer) -> TPLOperation
+eqOp    = liftOp :: (String -> String -> Bool) -> TPLOperation
+eqNumOp = liftOp :: (Integer -> Integer -> Bool) -> TPLOperation
+strOp   = liftOp :: (String -> String -> String) -> TPLOperation
 
 toNumber :: Coercer
 toNumber num@(Number _) = return num

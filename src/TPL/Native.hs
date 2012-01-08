@@ -13,6 +13,7 @@ import TPL.Value
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)),
                 ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
                 ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
+                (">", eqNumOp (>)),
                 ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
                 ("open", open), ("print", printTPL)]
 
