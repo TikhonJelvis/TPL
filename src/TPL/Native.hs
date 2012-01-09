@@ -14,7 +14,7 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)),
                 ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
                 ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)),
-                ("><", strOp (++)), (":", cons), ("!", index), ("..", range),
+                ("><", strOp (++)), (":", cons),
                 ("open", open), ("print", printTPL)]
 
 cons :: TPLOperation
@@ -24,17 +24,6 @@ cons env [val, tail@(String _)]     = do str <- liftThrows $ toString val
 cons _ [head@(String _), List []] = return head
 cons _ [head, List tail]          = return . List $ head : tail
 cons _ [head, tail]               = return . List $ head : [tail]
-
-index :: TPLOperation
-index _ [List list, Number i]  = return $ list !! fromInteger i
-index _ [List list, val]       = liftThrows $ (list !!) . fromInteger <$> (extract <=< toNumber) val
-index _ [String str, Number i] = return . String $ [str !! fromInteger i]
-index _ [String str, val]      = liftThrows $ (String . return . (str !!) . fromInteger) <$> (extract <=< toNumber) val
-index env [val, i]             = index env [(List [val]), i]
-
-range :: TPLOperation
-range _ [Number start, Number end] = return . List $ map Number [start..end]
-range env args                     = mapM (liftThrows . toNumber) args >>= range env
 
 open :: TPLOperation
 open _ args = do args   <- mapM (liftThrows <<< extract <=< toString) args
