@@ -27,7 +27,10 @@ eval env (If (Boolean condition) consequent alternate) =
 eval env (If condition consequent alternate) = 
   do condVal <- eval env condition >>= liftThrows . toBool
      eval env $ If condVal consequent alternate
-eval env (Id id) = get env id
+eval env (Id id) = do res <- get env id
+                      case res of
+                        Function closure [] body -> eval closure body
+                        _                        -> return res
 eval env (Operator op) = get env op
 eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
   where func = return . Function env [(Id "α")] 
@@ -78,7 +81,7 @@ operatorPrecedence = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
                       ("=", 7), ("/=", 7), (">", 7), ("<", 7),
                       ("<=", 7), (">=", 7), ("|", 8), ("&", 8),
-                      (":", 9), ("!", 9), ("..", 9),
+                      (":", 9), ("!", 9),
                       (":=", 11), ("<-", 11)]
 
 -- Native functions:
