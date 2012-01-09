@@ -1,6 +1,14 @@
 TPL
 ===
 
+## Example Code
+
+Check out the `base` library for some example code. This comes in five files: `base.tpl`, `base/function.tpl`, `base/list.tpl`, `base/logic.tpl` and `base/math.tpl`.
+
+This is just the standard library for the language. Right now it is *not* loaded by default; any serious code should have a `load 'base';` statement at the top. 
+
+The library is mostly written in a very functional style. Currently the one interesting imperative function is `partitionBy` in `base/list.tpl`.
+
 ## Summary 
 
 A silly little programming language that I'm working on for fun. I'm writing it in [Haskell](http://www.haskell.org) using the awesome [Parsec library](http://www.haskell.org/haskellwiki/Parsec) for parsing.
