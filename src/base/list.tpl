@@ -24,6 +24,10 @@ for := (<<);
 length [x, xs...] := if (is x) 1 + length xs else 0;
 head [a] := a;
 tail [_, xs...] := xs;
+init [x1, x2, xs...] := if (is xs) [x1, x2] ++ init xs else if (is x2) x1 else [];
+last [x, xs...] := if (is xs) last xs else x;
+
+element ~> [x, xs...] := if (is x) (element = x) | (element ~> xs) else false;
 
 filter pred [x, xs...] := if (isnt x) []
                      else if (pred x)   x : filter pred xs
@@ -43,9 +47,20 @@ partitionBy pred ls := {
   [l, r];
 };
 
+groupBy fn ls := {
+  curr := null;
+  res  := [];
+  for ls \ x -> {
+    if (fn x = curr) res <- init res ++ [last res ++ [x]]
+    else             res <- res ++ [[x]];
+    curr <- fn x;
+  };
+  res;
+};
+
 take n [x, xs...] := if (is x & n) x : take (n - 1) xs else [];
 drop n [x, xs...] := if (isnt x) [] else if (n) drop (n - 1) xs else x:xs;
-sub start end ls := take (end - start) $ drop start ls;
+sub start end ls  := take (end - start) $ drop start ls;
 
 reverse [x, xs...] := if (isnt x) [] else reverse xs ++ x;
 
