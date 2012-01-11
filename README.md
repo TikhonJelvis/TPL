@@ -32,7 +32,22 @@ You can define functions in two different ways:
     f := \ n -> n + 1;
     f n := n + 1;
 
-Functions are called without parentheses; `f a b c` is equal to `f(a, b, c)` in C-like languages. 
+Functions are called without parentheses; `f a b c` is equal to `f(a, b, c)` in C-like languages.
+
+If you do not pass enough arguments to a function, it will just *curry* the arguments you did pass in. Given
+
+    f a b c := a + b * c;
+
+calling `f 1 2` results in:
+   
+    λ α1 → {λ a b c → {a + b * c} 1 2 α1}
+
+This also means that functions with *no* arguments (often called "thunks") are called just by their name:
+
+    f := \ -> 1 + 2;
+    f = 3;
+
+There is currently no way to reference a thunk without calling it. While I think this feature is not as necessary as it seems, I will probably add some way to do it in the future (maybe along with the "laziness-on-demand" stuff I want to add).
 
 `\ a b c -> ...` is a lambda expression and can be used anywhere a normal expression can. You can also call a lambda directly:
 
@@ -48,11 +63,11 @@ Later on, you can change the value of `x` using `<-`.
 
 This will change the current binding of `x` no matter which scope you are currently in. If you use `:=` instead, it will create a new variable unless it already exists in the *current* scope.
 
-   x := 0;
-   (\ n -> x := n) 10;
-   x = 0;
-   (\ n -> x <- n) 10;
-   x = 10;
+    x := 0;
+    (\ n -> x := n) 10;
+    x = 0;
+    (\ n -> x <- n) 10;
+    x = 10;
 
 All expressions have values; practically anything can be an expression. Particularly, a block of code (between { and }) is an expression with the value of its last expression; it can be put anywhere a normal expression could be. So:
 
