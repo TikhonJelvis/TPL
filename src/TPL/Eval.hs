@@ -32,7 +32,7 @@ eval env (Id id) = do res <- get env id
                         Function closure [] body -> eval closure body
                         _                        -> return res
 eval env (Operator op) = get env op
-eval env val@(Expression _) = liftThrows (handleInfix val) >>= evalExp env
+eval env val@(Expression _) = handleInfix env val >>= evalExp env
   where func = return . Function env [(Id "α")] 
         evalExp env (Expression [op@(Operator _), right])     = func $ (Expression [(Id "α"), op, right])
         evalExp env (Expression [left, op@(Operator _)])      = func $ (Expression [left, op, (Id "α")])
@@ -59,25 +59,26 @@ apply env fn@(Function closure params body) args
 isOp (Operator _) = True
 isOp _            = False
 
-handleInfix :: TPLValue -> ThrowsError TPLValue
-handleInfix (Expression exp) =
+handleInfix :: Env -> TPLValue -> IOThrowsError TPLValue
+handleInfix env (Expression exp) =
   squash . Expression <$> (foldl1 (.) handleAll $ return exp')
   where exp' = map (squash . Expression) $ groupBy ((==) `on` isOp) exp
         handleAll = map ((=<<) . handle) operatorPrecedences
-        handle :: Int -> [TPLValue] -> ThrowsError [TPLValue]
-        handle precedence vals@(left : op@(Operator opStr) : right : more)
-          | precedenceOf opStr == precedence =
-            handle precedence $ (Expression [left, op, right]) : more
-          | otherwise = fmap (left:) $ handle precedence (op:right:more)
+        handle :: Int -> [TPLValue] -> IOThrowsError [TPLValue]
+        handle precedence vals@(left : op@(Operator opStr) : right : more) = precedenceOf env opStr >>= handleOp op . fromIntegral
+          where handleOp op actualPrecdence
+                  | actualPrecdence  == precedence = 
+                    handle precedence $ (Expression [left, op, right]) : more
+                  | otherwise = (left:) <$> handle precedence (op:right:more)
         handle precedence (left:more) = fmap (left:) $ handle precedence more
         handle precedence val         = return val
-handleInfix value = return value
+handleInfix _ value = return value
 
-precedenceOf :: String -> Int
-precedenceOf = fromMaybe 10 . (`lookup` operatorPrecedence)
+precedenceOf :: Env -> String -> IOThrowsError Integer
+precedenceOf env op = getPrecedence env op >>= liftThrows . extract
 
 operatorPrecedences = [11,10..0]
-operatorPrecedence = [("+", 5), ("-", 5),
+defaultPrecedences = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
                       ("=", 7), ("/=", 7), (">", 7), ("<", 7),
                       ("<=", 7), (">=", 7), ("|", 8), ("&", 8),
@@ -91,7 +92,8 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
-natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("with", with)] ++ 
+natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), 
+           ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp)] ++ 
           map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                safe op env $ left:strict)
@@ -136,9 +138,18 @@ with env [(List bindings), body] = do let vars = mapM (toBinding . squash) bindi
                                       eval res body
   where toBinding (List [name, val]) = do val <- eval env val
                                           return (show name, val)
+                                          
+setPrecedenceOp :: TPLOperation
+setPrecedenceOp env [Expression [(Operator op)], precedenceExpr] = 
+  do precedence <- eval env precedenceExpr >>= liftThrows . extract
+     setPrecedence env op precedence
+     return $ Number precedence
+     
+getPrecedenceOp :: TPLOperation
+getPrecedenceOp env [Expression [(Operator op)]] = getPrecedence env op
  
-
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
+                  >>= (`bindVars` map (\(op, prec) -> ("precedenceOf" ++ op, Number prec)) defaultPrecedences)
 
 evalString :: Env -> String -> IO String
 evalString env exp = runIOThrows . liftM show $

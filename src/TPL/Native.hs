@@ -29,7 +29,7 @@ open :: TPLOperation
 open _ args = do args   <- mapM (liftThrows <<< extract <=< toString) args
                  result <- concat <$> mapM (liftIO . readFile) args
                  return $ String result
-                 
+
 printTPL :: TPLOperation
 printTPL _ args = mapM (liftIO . putStrLn . show) args >> return Null
                                       

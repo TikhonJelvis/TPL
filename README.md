@@ -59,6 +59,20 @@ You can also use "operator slices" like in Haskell:
 
 This code will add 2 to each of the list's items. The `+ 2` expression actually evaluates to a function in the form `λ α → α + 2`; the greek letter α is used because it cannot currently be used as a normal identifier. The opposite expression would have worked too: `2 +` results in `λ α -> 2 + α`. I suspect bad things might happen if you try to nest slices, so don't.
 
+You can set the precedence of an operator--whether or not you've defined it--using the built-in `precedence` function:
+
+    1 + 2 * 3 = 7;
+    precedence (+) 3;
+    1 + 2 * 3 = 9;
+
+The precedence should be a number between 1 and 11; 10 is the default.
+
+You can get the current precedence of an operator using `precedenceOf`.
+
+    precedenceOf (*) = 4
+
+Note how you need to wrap the operators in parentheses in these cases. Without the parentheses, the expressions will not be parsed correctly.
+
 ### Pattern Matching (Destructuring Assignment)
 
 There is *very basic* pattern matching, which is really like "destructuring assignment" from JavaScript. I want to have proper pattern matching, but that comes later (if at all :)).

@@ -37,3 +37,15 @@ bindVars :: Env -> [(String, TPLValue)] -> IO Env
 bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
   where extend bindings env = (++ env) <$> mapM addBinding bindings
         addBinding (name, val) = newIORef val >>= \ ref -> return (name, ref)
+
+defaultPrecedence = 10
+
+getPrecedence :: Env -> String -> IOThrowsError TPLValue
+getPrecedence env op = do let prec = "precedenceOf" ++ op
+                          precedenceSet <- liftIO $ exists env prec
+                          if precedenceSet
+                            then get env $ "precedenceOf" ++ op
+                            else return $ Number defaultPrecedence
+
+setPrecedence :: Env -> String -> Integer -> IOThrowsError TPLValue
+setPrecedence env op precedence = define env ("precedenceOf" ++ op) $ Number precedence
