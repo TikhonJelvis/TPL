@@ -1,6 +1,3 @@
-succ n := n + 1;
-pred n := n -1;
-
 not b := if (b) false else true;
 
 a <= b := not (a > b);

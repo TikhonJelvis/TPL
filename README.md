@@ -7,15 +7,7 @@ Check out the `base` library for some example code. This comes in five files: `b
 
 This is just the standard library for the language. Right now it is *not* loaded by default; any serious code should have a `load 'base';` statement at the top. 
 
-The library is mostly written in a very functional style. Currently the one interesting imperative function is `partitionBy` in `base/list.tpl`.
-
-## Summary 
-
-A silly little programming language that I'm working on for fun. I'm writing it in [Haskell](http://www.haskell.org) using the awesome [Parsec library](http://www.haskell.org/haskellwiki/Parsec) for parsing.
-
-Currently the idea is for it to be simple, dynamically typed, interpreted, impure and eagerly evaluated--basically the exact opposite of Haskell.
-
-This language isn't really meant for use; it's just a fun didactic exercise. Besides, everybody wants to have their own language...
+The library is mostly written in a very functional style. However, there are some interesting functions like `partitionBy` in `base/list.tpl` that are written in a more imperative style.
 
 ## Future Features:
 
@@ -23,22 +15,44 @@ In the near future, I want to add:
   
   - more extensive and useful pattern matching (not just destructuring assignment for lists).
   - better error handling and reporting
-  - functions with no arguments (they can't really be called right now...)
-  - more standard functions (both native and part of `base.tpl`)
-
+  - more standard functions (IO is particularly lacking right now)
+  - laziness on demand--I want functions to be able to control which of their parameters gets evaluated
+  - maybe an OOP system of some kind--most likely prototype-based (no classes)
 
 ## Details:
 
 ### Basics
 
-`:=` and `<-` are broadly equal to `define` and `set!` from Scheme.
+`:=` lets you define variables and functions. Defining a variable is easy:
 
-Functions are called without parentheses; `f a b c` is equal to `f(a, b, c)` in C-like languages. You can define functions in two different ways:
+    x := 0;
+
+You can define functions in two different ways:
 
     f := \ n -> n + 1;
     f n := n + 1;
 
-`\ a b c -> ...` is a lambda expression and can be used anywhere a normal expression can.
+Functions are called without parentheses; `f a b c` is equal to `f(a, b, c)` in C-like languages. 
+
+`\ a b c -> ...` is a lambda expression and can be used anywhere a normal expression can. You can also call a lambda directly:
+
+    (\ x -> x + 10) 100 = 110;
+
+The `=` tests for equality; any time I have a statement like this by itself in the docs, it means the statement is true.
+
+`:=` will create a new variable in the current scope. The only way to create a new scope is in a function. 
+
+Later on, you can change the value of `x` using `<-`. 
+
+    x <- x + 1;
+
+This will change the current binding of `x` no matter which scope you are currently in. If you use `:=` instead, it will create a new variable unless it already exists in the *current* scope.
+
+   x := 0;
+   (\ n -> x := n) 10;
+   x = 0;
+   (\ n -> x <- n) 10;
+   x = 10;
 
 All expressions have values; practically anything can be an expression. Particularly, a block of code (between { and }) is an expression with the value of its last expression; it can be put anywhere a normal expression could be. So:
 
