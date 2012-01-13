@@ -66,27 +66,30 @@ atomStr      = do atom <- frequency [(299, oneof [booleanStr,
                   return $ atom ++ end
                   
 -- Some convenience functions:
+                  
+trim = unwords . words
 
-isId (Id _) = True
-isId _      = False
+isId (Id id) exp = id == trim exp
+isId _ _         = False
 
-isNumber (Number _) = True
-isNumber _          = False
+isNumber (Number n) exp = read exp == n
+isNumber _ _            = False
 
-isString (String _) = True
-isString _          = False
+isString (String str) exp = read exp == str
+isString _ _              = False
 
-isBoolean (Boolean _) = True
-isBoolean _           = False
+isBoolean (Boolean b) "true"  = b
+isBoolean (Boolean b) "false" = not b
+isBoolean _ _                 = False
 
-isOperator (Operator _) = True
-isOperator _            = False
+isOperator (Operator op) val = op == trim val
+isOperator _ _               = False
 
-isBlock (Sequence _) = True
-isBlock _            = False
+isBlock (Sequence _) _ = True
+isBlock _ _            = False
 
-isIf (If _ _ _) = True
-isIf _          = False
+isIf (If _ _ _) _ = True
+isIf _ _          = False
 
 isValid (Left _)  = False
 isValid (Right _) = True
@@ -98,10 +101,10 @@ extract (Right val)                             = val
 
 testParses inp test = forAll inp $ \ exp ->
   let res = parse expressions "TPL" exp in
-  isValid res && test (extract res)
+  isValid res && test (extract res) exp
 
 -- Test that parsing single values works:
-prop_parseNull   = testParses nullStr (== Null)
+prop_parseNull   = testParses nullStr $ \ n _ -> n == Null
 prop_parseId     = testParses idStr isId
 prop_parseNum    = testParses numberStr isNumber
 prop_parseStr    = testParses stringStr isString
