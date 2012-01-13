@@ -1,4 +1,4 @@
-module TPL.Parse (TPLValue (..), expressions, parse) where
+module TPL.Parse (TPLValue (..), expressions, parse, operatorCharacters) where
 
 import Control.Applicative ((<$>))
 import Text.ParserCombinators.Parsec
@@ -50,8 +50,9 @@ identifier = do head     <- letter <|> char '_'
                 contents <- many idChar
                 return . Id $ head:contents
 
+operatorCharacters = "+-=*&^%$#@!?/.|~<>:"
 operator :: Parser TPLValue
-operator = Operator <$> many1 (oneOf "+-=*&^%$#@!?/.|~<>:") 
+operator = Operator <$> many1 (oneOf operatorCharacters) 
 
 list :: Parser TPLValue
 list = List <$> between (lexeme $ char '[') (char ']') (expression `sepBy` lexeme (char ','))
