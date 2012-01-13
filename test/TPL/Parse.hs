@@ -57,10 +57,11 @@ ifElseStr    = do sp1       <- spaces
                   alternate <- exprStr
                   return $ ifPart ++ sp1 ++ "else" ++ sp2 ++ alternate
                   
-atomStr      = do atom <- oneof [lambdaStr, ifStr, ifElseStr, booleanStr,
+atomStr      = do atom <- frequency [(299, oneof [booleanStr,
                                  nullStr, idStr, stringStr, numberStr,
-                                 operatorStr, listStr, parenExprStr,
-                                 blockStr]
+                                 operatorStr]),
+                                     (1, oneof [lambdaStr, ifStr, ifElseStr,
+                                         parenExprStr, blockStr])]
                   end  <- spaces
                   return $ atom ++ end
                   
