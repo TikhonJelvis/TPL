@@ -1,4 +1,4 @@
-module TPL.Parse.Test where
+module TPL.Test.Parse where
 
 import Control.Applicative
 import Control.Monad
@@ -57,7 +57,7 @@ ifElseStr    = do sp1       <- spaces
                   alternate <- exprStr
                   return $ ifPart ++ sp1 ++ "else" ++ sp2 ++ alternate
                   
-atomStr      = do atom <- frequency [(299, oneof [booleanStr,
+atomStr      = do atom <- frequency [(124, oneof [booleanStr,
                                  nullStr, idStr, stringStr, numberStr,
                                  operatorStr]),
                                      (1, oneof [lambdaStr, ifStr, ifElseStr,
@@ -99,9 +99,9 @@ extract (Right (Sequence [val]))                = val
 extract (Right (Expression [val]))              = val
 extract (Right val)                             = val
 
-testParses inp test = forAll inp $ \ exp ->
-  let res = parse expressions "TPL" exp in
-  isValid res && test (extract res) exp
+testParses inp test = forAll inp $ \ inp ->
+  let res = parse expressions "TPL" inp in
+  isValid res && test (extract res) inp
 
 -- Test that parsing single values works:
 prop_parseNull   = testParses nullStr $ \ n _ -> n == Null
