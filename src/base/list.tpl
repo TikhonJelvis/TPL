@@ -9,7 +9,7 @@ is x  := x /= null;
 isnt  := not . is;
 are   := fold (&) . map is;
 
-a .. b := if (a > b) reverse $ b..a 
+a .. b := if (a > b) reverse @ b..a 
    else if (a = b) [a] 
    else            a : (succ a .. b);
 
@@ -60,7 +60,7 @@ groupBy fn ls := {
 
 take n [x, xs...] := if (is x & n) x : take (n - 1) xs else [];
 drop n [x, xs...] := if (isnt x) [] else if (n) drop (n - 1) xs else x:xs;
-sub start end ls  := take (end - start) $ drop start ls;
+sub start end ls  := take (end - start) @ drop start ls;
 
 reverse [x, xs...] := if (isnt x) [] else reverse xs ++ x;
 
