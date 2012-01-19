@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, OverlappingInstances#-}
 module TPL.Coerce (TPLOperation, 
                    liftOp, numOp, eqOp, strOp, eqNumOp,
                    toBool, toNumber, toString, 
@@ -31,6 +31,11 @@ instance Extractable Bool where
   extract (Boolean bool)  = return bool
   extract val             = toBool val >>= extract
 instance Packable Bool where pack = Boolean
+                             
+instance Extractable a => Extractable [a] where
+  extract (List vals) = sequence $ map extract vals
+  extract value       = sequence [extract value]
+instance Packable a => Packable [a] where pack = List . map pack
 
 liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
 liftOp op = \ env [a, b] ->

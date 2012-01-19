@@ -35,7 +35,6 @@ stringLiteral = do opener   <- oneOf "\"'"
                    contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
                    char opener
                    return $ String contents
-
 bool :: Parser TPLValue
 bool = Boolean . (== "true") <$> (keyWord "true" <|> keyWord "false")
 
@@ -50,7 +49,7 @@ identifier = do head     <- letter <|> char '_'
                 contents <- many idChar
                 return . Id $ head:contents
 
-operatorCharacters = "+-=*&^%$#@!?/.|~<>:"
+operatorCharacters = "+-=*&^%#@!?/.|~<>:"
 operator :: Parser TPLValue
 operator = Operator <$> many1 (oneOf operatorCharacters) 
 
@@ -91,6 +90,10 @@ ifStatement = try $ do keyWord "if"
 parenExp :: Parser TPLValue
 parenExp = between (lexeme $ char '(') (char ')') $ expression
 
+delayedExp :: Parser TPLValue
+delayedExp = do char '$'
+                Lambda [] <$> atom
+
 atom :: Parser TPLValue
 atom = lexeme $ lambda
             <|> ifStatement
@@ -103,6 +106,7 @@ atom = lexeme $ lambda
             <|> list
             <|> parenExp
             <|> block
+            <|> delayedExp
 
 expressions :: Parser TPLValue
 expressions = Sequence <$> expression `sepEndBy` lexeme terminator
