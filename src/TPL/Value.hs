@@ -34,8 +34,8 @@ instance Show TPLValue where
   show (Expression vals)        = "<" ++ showSeq vals ++ ">"
   show (Sequence vals)          = "\\" ++ (unlines $ map show vals) ++ "/"
   show (Native name)            = "[<native> " ++ name ++ "]"
-  show (Function e [] body)     = "$(" ++ show body ++ ")"
-  show (Lambda [] body)         = "$(" ++ show body ++ ")"
+  show (Function e [] body)     = "$f(" ++ show body ++ ")"
+  show (Lambda [] body)         = "$λ(" ++ show body ++ ")"
   show (Function e params body) = showFun params body
   show (Lambda params body)     = showFun params body
   show (If condition consequent alternate) = "{?if " ++ show condition ++

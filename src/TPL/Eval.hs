@@ -51,7 +51,9 @@ apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env fn@(Function closure params body) args 
   | length args < length params = Function closure newParams <$> newBody
   | otherwise                   = eArgs >>= liftIO . bindVars closure . unify params >>= (`eval` body)
-    where eArgs = mapM (eval env) args
+    where eArgs = mapM conditionallyEval $ zip params args
+          conditionallyEval (Lambda{}, arg) = return arg
+          conditionallyEval (_, arg)        = eval env arg
           newParams = map (Id . ("α" ++) . show) [1..length params - length args]
           newBody   = do args <- eArgs
                          return . Expression $ (fn : args) ++ newParams
