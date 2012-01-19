@@ -29,6 +29,8 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = do res <- get env id
                       case res of
+                        exp@(Expression{})       -> eval env exp
+                        Lambda [] body           -> eval env body
                         Function closure [] body -> eval closure body
                         _                        -> return res
 eval env (Operator op) = get env op
@@ -54,7 +56,9 @@ apply env fn@(Function closure params body) args
     where eArgs = mapM conditionallyEval $ zip params args
           conditionallyEval (Lambda{}, arg) = return arg
           conditionallyEval (_, arg)        = eval env arg
-          newParams = map (Id . ("α" ++) . show) [1..length params - length args]
+          newParams = map getName $ zip [1..length params - length args] (drop (length args) params)
+          getName (number, Lambda{}) = Lambda [] . Id . ("α" ++) $ show number
+          getName (number, id) = Id . ("α" ++) $ show number
           newBody   = do args <- eArgs
                          return . Expression $ (fn : args) ++ newParams
 
