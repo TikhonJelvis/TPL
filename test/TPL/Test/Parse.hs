@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module TPL.Test.Parse where
 
 import Control.Applicative
@@ -6,9 +7,12 @@ import Control.Monad
 import Data.List
 
 import Test.QuickCheck
+import Test.QuickCheck.All
 
 import TPL.Parse
 import TPL.Value
+
+runAll = $quickCheckAll
   
 permutationsOf :: [a] -> Gen [a]
 permutationsOf = return . take 10 <=< listOf1 . oneof . map return

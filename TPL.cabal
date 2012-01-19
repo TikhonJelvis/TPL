@@ -42,7 +42,7 @@ Build-type:          Simple
 -- Extra-source-files:  
 
 -- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.8
+Cabal-version:       >=1.9.2
 
 Library
   Build-depends:       base, parsec >= 3, mtl
@@ -53,10 +53,15 @@ Library
 Executable tpl
   -- .hs or .lhs file containing the Main module.
   Main-is:             src/TPL/Main.hs
-  
+
   -- Packages needed in order to build this package.
   Build-depends:       base, parsec >= 3, tpl
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
   
+Test-Suite test-tpl
+  Build-depends:       base, parsec >= 3, QuickCheck, tpl
+  Type:                exitcode-stdio-1.0
+  Hs-source-dirs:      test
+  Main-is:             test.hs
