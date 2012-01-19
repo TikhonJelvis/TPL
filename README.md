@@ -75,6 +75,32 @@ All expressions have values; practically anything can be an expression. Particul
 
 is valid and `blarg 50` will return the string `blarg`.
 
+### Delaying Expressions
+
+You can "delay" expressions using a `$` prefix. Basically, delaying just pushes back when an expression is evaluated. Instead of being evaluated *immediately*, it is evaluated when it is next used. For example:
+
+   x := 0;
+   r := $x;
+   r = 0;
+   x <- 10;
+   r = 10;
+   x <- x + 1;
+   r = 11;
+
+You can similarly delay more complex expressions by wrapping them in parentheses or a block:
+
+    x := 0;
+    r := $(x + 10)
+    x <- 10;
+    r = 20;
+    r <- ${a := 3; x + a};
+    x <- 15;
+    r = 18;
+
+This gives you a bit more control over when things are evaluated and lets you use a simple form of reactive programming. For example, given a hypothetical function that returned the current mouse position, you could make a variable that is *always* 10px over from the mouse:
+
+    nearX := $mouseX
+
 ### Operators
 
 You can define custom operators. For example, `<<` is equal to `map` in the standard library:
