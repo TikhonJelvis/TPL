@@ -4,6 +4,14 @@ TPL is a dynamically typed, imperative, interpreted scripting language. The main
 
 TPL is heavily influenced by JavaScript, Haskell and Scheme; I also took ideas from other languages I've used. 
 
+## Installation Instructions
+
+To install, clone this repository and use `cabal`:
+
+    git clone git://github.com/TikhonJelvis/TPL.git
+    cd TPL
+    cabal install
+
 ## Documentation
 
 The only documentation is currently a relatively thorough [user guide](http://inst.eecs.berkeley.edu/~tikhon/tpl).
