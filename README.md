@@ -8,7 +8,7 @@ TPL is heavily influenced by JavaScript, Haskell and Scheme; I also took ideas f
 
 The only documentation is currently a relatively thorough [user guide](http://inst.eecs.berkeley.edu/~tikhon/tpl).
 
-It is available as a markdown file called `Guide.md` in this repository as well.
+It is available as a markdown file called [`Guide.md`](https://github.com/TikhonJelvis/TPL/blob/master/Guide.md) in this repository as well.
 
 ## Future Features:
 
