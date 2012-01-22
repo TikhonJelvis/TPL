@@ -1,4 +1,5 @@
 load 'base/function';
+load 'base/logic';
 
 map fn [x, xs...] := if (is x) fn x : map fn xs else [];
 
@@ -65,3 +66,8 @@ sub start end ls  := take (end - start) @ drop start ls;
 reverse [x, xs...] := if (isnt x) [] else reverse xs ++ x;
 
 repeat x n := if (n) x : repeat x (n - 1) else [];
+
+and := fold1 (&);
+or  := fold1 (|);
+
+none ls := filter id ls = [];

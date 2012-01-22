@@ -11,3 +11,6 @@ load 'base/function'
      'base/list'
      'base/logic'
      'base/math';
+
+$case -> $result := \ x -> if (x = case) result;
+switch value [case, rest...] := case value | (rest & switch value rest)
