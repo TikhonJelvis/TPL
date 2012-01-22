@@ -18,6 +18,23 @@ The only documentation is currently a relatively thorough [user guide](http://in
 
 It is available as a markdown file called [`Guide.md`](https://github.com/TikhonJelvis/TPL/blob/master/Guide.md) in this repository as well.
 
+## Flexibility
+
+One of the core tenants of TPL is flexibility: you should be able to meaningfully extend the language *in* the language. 
+
+You could want to add your own control structures. For example, the language does not have any sort of `switch` statement by default. Happily, you can write one yourself:
+
+    $case -> $result := \ x -> if (x = case) result;
+    switch value [case, rest...] := case value | (rest & switch value rest)
+
+This could then be used like this:
+
+    switch a [
+      1 -> "one",
+      2 -> "two",
+      3 -> "three"
+    ];
+
 ## Future Features:
 
 In the near future, I want to add:
