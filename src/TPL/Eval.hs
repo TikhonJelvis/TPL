@@ -5,6 +5,7 @@ import Control.Arrow
 import Control.Monad.Error
 
 import Data.Function
+import Data.IORef
 import Data.List
 import Data.Maybe
 
@@ -29,17 +30,16 @@ eval env (If condition consequent alternate) =
      eval env $ If condVal consequent alternate
 eval env (Id id) = do res <- get env id
                       case res of
-                        exp@(Expression{})       -> eval env exp
                         Lambda [] body           -> eval env body
                         Function closure [] body -> eval closure body
-                        _                        -> return res
+                        exp                      -> eval env exp
 eval env (Operator op) = get env op
 eval env val@(Expression _) = handleInfix env val >>= evalExp env
   where func = return . Function env [(Id "α")] 
-        evalExp env (Expression [op@(Operator _), right])     = func $ (Expression [(Id "α"), op, right])
-        evalExp env (Expression [left, op@(Operator _)])      = func $ (Expression [left, op, (Id "α")])
+        evalExp env (Expression [op@(Operator{}), right])     = func $ (Expression [(Id "α"), op, right])
+        evalExp env (Expression [left, op@(Operator{})])      = func $ (Expression [left, op, (Id "α")])
         evalExp env (Expression [a, Operator op, b])          = evalExp env $ Expression [(Id op), a, b]
-        evalExp env (Expression (fn@(Function _ _ _) : args)) = apply env fn args
+        evalExp env (Expression (fn@(Function{}) : args))     = apply env fn args
         evalExp env (Expression ((Native name) : args))       = native env name args
         evalExp env (Expression (first : rest))               = do res <- eval env first
                                                                    evalExp env $ Expression (res : rest)
@@ -54,7 +54,7 @@ apply env fn@(Function closure params body) args
   | length args < length params = Function closure newParams <$> newBody
   | otherwise                   = eArgs >>= liftIO . bindVars closure . unify params >>= (`eval` body)
     where eArgs = mapM conditionallyEval $ zip params args
-          conditionallyEval (Lambda{}, arg) = return arg
+          conditionallyEval (Lambda{}, arg) = return $ Function env [] arg
           conditionallyEval (_, arg)        = eval env arg
           newParams = map getName $ zip [1..length params - length args] (drop (length args) params)
           getName (number, Lambda{}) = Lambda [] . Id . ("α" ++) $ show number
@@ -62,7 +62,7 @@ apply env fn@(Function closure params body) args
           newBody   = do args <- eArgs
                          return . Expression $ (fn : args) ++ newParams
 
-isOp (Operator _) = True
+isOp (Operator{}) = True
 isOp _            = False
 
 handleInfix :: Env -> TPLValue -> IOThrowsError TPLValue
@@ -99,7 +99,8 @@ native env name args = case lookup name natives of
   
 natives :: [(String, Env -> [TPLValue] -> IOThrowsError TPLValue)]
 natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), 
-           ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp)] ++ 
+           ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
+           ("define", _define), ("set", _set)] ++ 
           map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                safe op env $ left:strict)
@@ -123,6 +124,24 @@ defineOp env [Expression [left, Operator op, right], body] =
 defineOp env [Expression ((Id fn):args), body] = define env fn $ Function env args body
 defineOp env [List vals, body]      = do res <- eval env body
                                          definePattern env [List vals, squash res]
+                                         
+extractId :: Env -> TPLValue -> IOThrowsError String
+extractId env (Id id)                 = do res <- get env id
+                                           case res of
+                                             Id str -> return str
+                                             _      -> extractId env res
+extractId env (String str)            = return str
+extractId env (Lambda [] (Id id))     = return id 
+extractId env (Function _ [] (Id id)) = return id
+extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
+
+_define :: TPLOperation
+_define env [exp, val] = do name <- extractId env exp
+                            eval env val >>= define env name 
+                              
+_set :: TPLOperation
+_set env [exp, val] = do name <- extractId env exp
+                         eval env val >>= set env name
 
 definePattern :: TPLOperation
 definePattern env [List vals, List body] = do mapM defPair $ unify vals body
@@ -132,16 +151,18 @@ definePattern env [List vals, body] = defineOp env [List vals, List [body]]
 
   
 setOp :: TPLOperation
-setOp env ls@[Id _, _]           = set env ls
+setOp env [Id name, val]         = set env name val
 setOp env [List vals, List body] = do mapM setPair $ unify vals body
                                       return $ List body
-  where setPair (name, val) = set env [Id name, val]
+  where setPair (name, val) = set env name val
 setOp env [List vals, body]      = setOp env [List vals, List [body]]
 
 with :: TPLOperation
-with env [(List bindings), body] = do let vars = mapM (toBinding . squash) bindings
-                                      res <- vars >>= liftIO . bindVars env
-                                      eval res body
+with env [List bindings, body] = do let vars = mapM (toBinding . squash) bindings
+                                    res <- vars >>= liftIO . bindVars env
+                                    case body of
+                                      Function _ [] exp  -> eval res $ Function res [] exp
+                                      exp                -> eval res exp
   where toBinding (List [name, val]) = do val <- eval env val
                                           return (show name, val)
                                           

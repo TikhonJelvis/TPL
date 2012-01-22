@@ -21,6 +21,6 @@ unify exps vals = let exps' = map squash exps
         extract name ls = [v | (n, v) <- ls, n == name]
           
 squash :: TPLValue -> TPLValue
-squash (Expression [val]) = squash val
-squash (Sequence [val])   = squash val
-squash val                = val
+squash (Expression [val])  = squash val
+squash (Sequence [val])    = squash val
+squash val                 = val

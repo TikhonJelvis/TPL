@@ -10,11 +10,9 @@ import TPL.Coerce
 import TPL.Error
 import TPL.Value
 
-eagerNatives = [("+", numOp (+)), ("-", numOp (-)),
-                ("*", numOp (*)), ("/", numOp div), ("|", liftOp (||)), 
-                ("&", liftOp (&&)), ("=", eqOp (==)), ("/=", eqOp (/=)),
-                (">", eqNumOp (>)),
-                ("><", strOp (++)), (":", cons),
+eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
+                ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
+                (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
                 ("open", open), ("print", printTPL)]
 
 cons :: TPLOperation

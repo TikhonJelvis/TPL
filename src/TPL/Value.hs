@@ -32,7 +32,7 @@ instance Show TPLValue where
   show (Boolean bool)           = if bool then "true" else "false"
   show (List vals)              = show vals
   show (Expression vals)        = showSeq vals
-  show (Sequence vals)          = "\\" ++ (unlines $ map show vals) ++ "/"
+  show (Sequence vals)          = "{\n" ++ (unlines $ map show vals) ++ "}"
   show (Native name)            = "[<native> " ++ name ++ "]"
   show (Function e [] body)     = "$(" ++ show body ++ ")"
   show (Lambda [] body)         = "$(" ++ show body ++ ")"
@@ -43,4 +43,4 @@ instance Show TPLValue where
                                              " else " ++ show alternate ++ "?}"
 
 showFun :: [TPLValue] -> TPLValue -> String
-showFun params body = "λ " ++ showSeq params ++ " → {" ++ show body ++ "}"
+showFun params body = "λ " ++ showSeq params ++ " → " ++ show body
