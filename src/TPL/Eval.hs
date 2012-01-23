@@ -33,7 +33,6 @@ eval env (Id id) = do res <- get env id
                         Lambda [] body           -> eval env body
                         Function closure [] body -> eval closure body
                         exp                      -> eval env exp
-eval env (Function closure [] body) = eval closure body
 eval env (Operator op) = get env op
 eval env val@(Expression _) = handleInfix env val >>= evalExp env
   where func = return . Function env [(Id "α")] 
@@ -45,10 +44,10 @@ eval env val@(Expression _) = handleInfix env val >>= evalExp env
         evalExp env (Expression (first : rest))               = do res <- eval env first
                                                                    evalExp env $ Expression (res : rest)
         evalExp env val                                       = eval env val
-eval env (List vals)     = List <$> mapM (eval env) vals
-eval env (Sequence vals) = Expression . return . last <$> mapM (eval env) vals
+eval env (List vals)        = List <$> mapM (eval env) vals
+eval env (Sequence vals)    = Expression . return . last <$> mapM (eval env) vals
 eval env (Lambda args body) = return $ Function env args body
-eval env val             = return val
+eval env val                = return val
 
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
 apply env fn@(Function closure params body) args 
@@ -100,7 +99,7 @@ native env name args = case lookup name natives of
 natives :: [(String, TPLOperation)]
 natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), 
            ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
-           ("define", _define), ("set", _set)] ++ map eager eagerNatives
+           ("define", _define), ("set", _set), ("get", _get)] ++ map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                op env $ left:strict)
         eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= op env)
@@ -131,6 +130,10 @@ extractId env (Lambda [] (Id id))     = return id
 extractId env (Function _ [] (Id id)) = return id
 extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
 
+_get :: TPLOperation
+_get env [exp] = do name <- extractId env exp
+                    get env name
+
 _define :: TPLOperation
 _define env [exp, val] = do name <- extractId env exp
                             eval env val >>= define env name 
@@ -138,6 +141,20 @@ _define env [exp, val] = do name <- extractId env exp
 _set :: TPLOperation
 _set env [exp, val] = do name <- extractId env exp
                          eval env val >>= set env name
+
+with :: TPLOperation
+with env [List bindings, Function _ args body] = 
+  do let vars = mapM (toBinding . squash) bindings
+     res <- vars >>= liftIO . bindVars env
+     apply env (Function res args body) []
+  where toBinding (Expression [name, Operator "->", val]) = toBinding $ List [name, val]
+        toBinding (List [id, val]) = do val  <- eval env val
+                                        name <- extractId env id
+                                        return (name, val)
+with env [bindings, Id id] = do val <- get env id
+                                with env [bindings, val]
+with env [bindings, exp]   = do evaluated <- eval env exp
+                                with env [bindings, evaluated]
 
 definePattern :: TPLOperation
 definePattern env [List vals, List body] = do mapM defPair $ unify vals body
@@ -152,18 +169,6 @@ setOp env [List vals, List body] = do mapM setPair $ unify vals body
                                       return $ List body
   where setPair (name, val) = set env name val
 setOp env [List vals, body]      = setOp env [List vals, List [body]]
-
-with :: TPLOperation
-with env [bindings, Lambda args body] = with env [bindings, Function env args body]
-with env [List bindings, Function _ args body] = 
-  do let vars = mapM (toBinding . squash) bindings
-     res <- vars >>= liftIO . bindVars env
-     eval env $ Function res args body
-  where toBinding (Expression [name, Operator ":=", val]) = toBinding $ List [name, val]
-        toBinding (List [name, val]) = do val <- eval env val
-                                          return (show name, val)
-with env [bindings, exp] = do evaluated <- eval env exp
-                              with env [bindings, evaluated]
                                           
 setPrecedenceOp :: TPLOperation
 setPrecedenceOp env [Expression [Operator op], precedenceExpr] = 
