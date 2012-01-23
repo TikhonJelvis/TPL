@@ -33,6 +33,7 @@ eval env (Id id) = do res <- get env id
                         Lambda [] body           -> eval env body
                         Function closure [] body -> eval closure body
                         exp                      -> eval env exp
+eval env (Function closure [] body) = eval closure body
 eval env (Operator op) = get env op
 eval env val@(Expression _) = handleInfix env val >>= evalExp env
   where func = return . Function env [(Id "α")] 
@@ -153,13 +154,16 @@ setOp env [List vals, List body] = do mapM setPair $ unify vals body
 setOp env [List vals, body]      = setOp env [List vals, List [body]]
 
 with :: TPLOperation
-with env [List bindings, body] = do let vars = mapM (toBinding . squash) bindings
-                                    res <- vars >>= liftIO . bindVars env
-                                    case body of
-                                      Function _ [] exp  -> eval res $ Function res [] exp
-                                      exp                -> eval res exp
-  where toBinding (List [name, val]) = do val <- eval env val
+with env [bindings, Lambda args body] = with env [bindings, Function env args body]
+with env [List bindings, Function _ args body] = 
+  do let vars = mapM (toBinding . squash) bindings
+     res <- vars >>= liftIO . bindVars env
+     eval env $ Function res args body
+  where toBinding (Expression [name, Operator ":=", val]) = toBinding $ List [name, val]
+        toBinding (List [name, val]) = do val <- eval env val
                                           return (show name, val)
+with env [bindings, exp] = do evaluated <- eval env exp
+                              with env [bindings, evaluated]
                                           
 setPrecedenceOp :: TPLOperation
 setPrecedenceOp env [Expression [Operator op], precedenceExpr] = 
