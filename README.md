@@ -35,6 +35,17 @@ This could then be used like this:
       3 -> "three"
     ];
 
+You can also use dynamic scoping using the `with` native function, if you want. For example:
+
+    for $x $in ls $body := map (\ item -> with [x -> item] body) ls;
+    for i in (1..10) {
+      a := i + 1;
+      b := i - 1;
+      print @ b >< " " >< i >< " " >< c;
+    };
+
+Here `x` holds a *variable name* and `with` is used to set whatever `x` is to whatever `item` is inside of `body`. This means that whatever id `x` holds is dynamically typed. Magic!
+
 ## Future Features:
 
 In the near future, I want to add:
