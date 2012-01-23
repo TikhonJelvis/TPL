@@ -18,7 +18,6 @@ a .. b := if (a > b) reverse @ b..a
 
 fn >> ls := map fn ls;
 ls << fn := fn >> ls;
-for := (<<);
 
 [x, xs...] ++ ls := if (is x) x : (xs ++ ls) else ls;
 
@@ -42,16 +41,17 @@ unzip [[xs, ys]...] := [xs, ys];
 partitionBy pred ls := {
   l := [];
   r := [];
-  for ls \ x -> 
+  for x in  ls {
       if (pred x) l <- x : l 
     else          r <- x : r;
+  }
   [l, r];
 };
 
 groupBy fn ls := {
   curr := null;
   res  := [];
-  for ls \ x -> {
+  for x in ls {
     if (fn x = curr) res <- init res ++ [last res ++ [x]]
     else             res <- res ++ [[x]];
     curr <- fn x;
