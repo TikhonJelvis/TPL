@@ -13,7 +13,7 @@ import TPL.Value
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
-                ("open", open), ("print", printTPL)]
+                ("open", open), ("print", printTPL), ("substr", substr)]
 
 cons :: TPLOperation
 cons _ [String head, String tail]   = return . String $ head ++ tail
@@ -30,4 +30,14 @@ open _ args = do args   <- mapM (liftThrows <<< extract <=< toString) args
 
 printTPL :: TPLOperation
 printTPL _ args = mapM (liftIO . putStrLn . show) args >> return Null
-                                      
+
+substr :: TPLOperation
+substr _ [String str, Number start, Number end] =
+  let s = fromIntegral start
+      e = fromIntegral end in
+  return . String . take (e - s) $ drop s str
+substr env [str, start, end] = result >>= substr env
+  where result = liftThrows $ do str'   <- toString str
+                                 start' <- toNumber start
+                                 end'   <- toNumber end
+                                 return $ [str', start', end']
