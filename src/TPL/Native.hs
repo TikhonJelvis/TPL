@@ -13,7 +13,8 @@ import TPL.Value
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
-                ("open", open), ("print", printTPL), ("substr", substr)]
+                ("open", open), ("print", printTPL), ("substr", substr),
+                ("length", len)]
 
 cons :: TPLOperation
 cons _ [String head, String tail]   = return . String $ head ++ tail
@@ -41,3 +42,10 @@ substr env [str, start, end] = result >>= substr env
                                  start' <- toNumber start
                                  end'   <- toNumber end
                                  return $ [str', start', end']
+                                 
+len :: TPLOperation
+len _ [String str] = return . Number $ genericLength str
+len _ [List ls]    = return . Number $ genericLength ls
+len e [exp]        = do str <- liftThrows $ toString exp
+                        len e [str]
+                         

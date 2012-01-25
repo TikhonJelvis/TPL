@@ -11,4 +11,5 @@ load 'base/function'
      'base/list'
      'base/logic'
      'base/math'
-     'base/control';
+     'base/control',
+     'base/string';

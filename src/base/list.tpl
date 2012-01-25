@@ -21,7 +21,6 @@ ls << fn := fn >> ls;
 
 [x, xs...] ++ ls := if (is x) x : (xs ++ ls) else ls;
 
-length [x, xs...] := if (is x) 1 + length xs else 0;
 head [a] := a;
 tail [_, xs...] := xs;
 init [x1, x2, xs...] := if (is xs) [x1, x2] ++ init xs else if (is x2) x1 else [];
