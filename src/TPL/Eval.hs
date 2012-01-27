@@ -153,6 +153,9 @@ with env [List bindings, Function _ args body] =
                                         return (name, val)
 with env [bindings, Id id] = do val <- get env id
                                 with env [bindings, val]
+with env [Id id, exp]      = do bindings <- get env id
+                                with env [bindings, exp]
+with env [Function _ [] b, exp] = with env [b, exp]
 with env [bindings, exp]   = do evaluated <- eval env exp
                                 with env [bindings, evaluated]
 
