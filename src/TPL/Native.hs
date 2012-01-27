@@ -17,10 +17,6 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("length", len)]
 
 cons :: TPLOperation
-cons _ [String head, String tail]   = return . String $ head ++ tail
-cons env [val, tail@(String _)]     = do str <- liftThrows $ toString val
-                                         cons env [str, tail]
-cons _ [head@(String _), List []] = return head
 cons _ [head, List tail]          = return . List $ head : tail
 cons _ [head, tail]               = return . List $ head : [tail]
 
