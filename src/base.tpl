@@ -7,6 +7,8 @@ a <  b := not (a >= b);
 succ n := n + 1;
 pred n := n - 1;
 
+let $bindings $body := with bindings body;
+
 load 'base/function'
      'base/list'
      'base/logic'
