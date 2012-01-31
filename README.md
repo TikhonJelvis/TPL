@@ -53,7 +53,6 @@ In the near future, I want to add:
   - more extensive and useful pattern matching (not just destructuring assignment for lists).
   - better error handling and reporting
   - more standard functions (IO is particularly lacking right now)
-  - laziness on demand--I want functions to be able to control which of their parameters gets evaluated
   - maybe an OOP system of some kind--most likely prototype-based (no classes)
 
 ## Example Code
