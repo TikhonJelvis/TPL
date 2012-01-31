@@ -2,8 +2,7 @@
 module TPL.Coerce (TPLOperation, 
                    liftOp, numOp, eqOp, strOp, eqNumOp,
                    toBool, toNumber, toString, 
-                   extract, pack) 
-       where
+                   extract, pack) where
 
 import Control.Arrow
 import Control.Monad.Error
@@ -13,7 +12,6 @@ import TPL.Error
 import TPL.Value
 
 type TPLOperation = Env -> [TPLValue] -> IOThrowsError TPLValue
-type Coercer = TPLValue -> ThrowsError TPLValue
 
 -- Takes a function on TPLValues and makes it coerce to the given type.
 class Extractable a where extract :: TPLValue -> ThrowsError a
@@ -47,20 +45,20 @@ eqOp    = liftOp :: (String -> String -> Bool) -> TPLOperation
 eqNumOp = liftOp :: (Integer -> Integer -> Bool) -> TPLOperation
 strOp   = liftOp :: (String -> String -> String) -> TPLOperation
 
-toNumber :: Coercer
-toNumber num@(Number _) = return num
+toNumber :: TPLValue -> ThrowsError TPLValue
+toNumber num@(Number{}) = return num
 toNumber (String str)   = return . Number $ read str
 toNumber (List [])      = throwError . TypeMismatch "Number" . show $ List []
 toNumber (List (val:_)) = toNumber val
 toNumber (Boolean bool) = return . Number $ if bool then 1 else 0
 toNumber val            = throwError . TypeMismatch "Number" $ show val
 
-toString :: Coercer
+toString :: TPLValue -> ThrowsError TPLValue
 toString = liftM String . extract
 
-toBool :: Coercer
-toBool b@(Boolean _) = return b
-toBool (Null)        = return $ Boolean False
+toBool :: TPLValue -> ThrowsError TPLValue
+toBool b@(Boolean{}) = return b
+toBool Null          = return $ Boolean False
 toBool (Number 0)    = return $ Boolean False
 toBool (List [])     = return $ Boolean False
 toBool val           = return $ Boolean True
