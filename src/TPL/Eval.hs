@@ -15,6 +15,7 @@ import TPL.Error
 import TPL.Native
 import TPL.Parse
 import TPL.Pattern
+import TPL.Syntax
 import TPL.Value
 
 readExp :: String -> ThrowsError TPLValue
@@ -33,13 +34,8 @@ eval env (Id id) = do res <- get env id
                         Lambda [] body           -> eval env body
                         Function closure [] body -> eval closure body
                         exp                      -> eval env exp
-eval env (Operator op) = get env op
-eval env val@(Expression _) = handleInfix env val >>= evalExp env
-  where func = return . Function env [(Id "α")] 
-        evalExp env (Expression [op@(Operator{}), right])     = func $ (Expression [(Id "α"), op, right])
-        evalExp env (Expression [left, op@(Operator{})])      = func $ (Expression [left, op, (Id "α")])
-        evalExp env (Expression [a, Operator op, b])          = evalExp env $ Expression [(Id op), a, b]
-        evalExp env (Expression (fn@(Function{}) : args))     = apply env fn args
+eval env val@(Expression _) = normalize env val >>= evalExp env
+  where evalExp env (Expression (fn@(Function{}) : args))     = apply env fn args
         evalExp env (Expression ((Native name) : args))       = native env name args
         evalExp env (Expression (first : rest))               = do res <- eval env first
                                                                    evalExp env $ Expression (res : rest)
@@ -61,23 +57,6 @@ apply env fn@(Function closure params body) args
           getName (number, id) = Id . ("α" ++) $ show number
           newBody   = do args <- eArgs
                          return . Expression $ (fn : args) ++ newParams
-
-isOp (Operator{}) = True
-isOp _            = False
-
-handleInfix :: Env -> TPLValue -> IOThrowsError TPLValue
-handleInfix env (Expression exp) =
-  squash . Expression <$> (foldl1 (.) handleAll $ return exp')
-  where exp' = map (squash . Expression) $ groupBy ((==) `on` isOp) exp
-        handleAll = map ((=<<) . handle) operatorPrecedences
-        handle precedence vals@(left : op@(Operator opStr) : right : more) = precedenceOf env opStr >>= handleOp op . fromIntegral
-          where handleOp op actualPrecdence
-                  | actualPrecdence  == precedence = 
-                    handle precedence $ (Expression [left, op, right]) : more
-                  | otherwise = (left:) <$> handle precedence (op:right:more)
-        handle precedence (left:more) = fmap (left:) $ handle precedence more
-        handle precedence val         = return val
-handleInfix _ value = return value
 
 -- Native functions:
 native :: Env -> String -> [TPLValue] -> IOThrowsError TPLValue

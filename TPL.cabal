@@ -48,7 +48,7 @@ Library
   Build-depends:       base, parsec >= 3, mtl
   Hs-source-dirs:      src
   Exposed-modules:     TPL.Coerce, TPL.Env, TPL.Error, TPL.Eval, TPL.Native, 
-                       TPL.Parse, TPL.Pattern, TPL.Run, TPL.Value
+                       TPL.Parse, TPL.Pattern, TPL.Run, TPL.Syntax, TPL.Value
 
 Executable tpl
   -- .hs or .lhs file containing the Main module.

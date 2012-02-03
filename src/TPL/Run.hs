@@ -1,4 +1,4 @@
-module TPL.Run where
+module TPL.Run (repl, runFile) where
  
 import Control.Applicative
 import Control.Monad.Error
