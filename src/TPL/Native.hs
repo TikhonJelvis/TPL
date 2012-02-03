@@ -7,6 +7,7 @@ import Control.Monad.Error
 import Data.List
 
 import TPL.Coerce
+import TPL.Env
 import TPL.Error
 import TPL.Value
 
@@ -15,6 +16,17 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
                 ("open", open), ("print", printTPL), ("substr", substr),
                 ("length", len)]
+
+precedenceOf :: Env -> String -> IOThrowsError Integer
+precedenceOf env op = getPrecedence env op >>= liftThrows . extract
+
+operatorPrecedences = [11,10..0]
+defaultPrecedences = [("+", 5), ("-", 5),
+                      ("*", 4), ("/", 4), ("><", 6),
+                      ("=", 7), ("/=", 7), (">", 7), ("<", 7),
+                      ("<=", 7), (">=", 7), ("|", 8), ("&", 8),
+                      (":", 9), ("!", 9),
+                      (":=", 11), ("<-", 11)]
 
 cons :: TPLOperation
 cons _ [head, List tail]          = return . List $ head : tail

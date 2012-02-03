@@ -79,17 +79,6 @@ handleInfix env (Expression exp) =
         handle precedence val         = return val
 handleInfix _ value = return value
 
-precedenceOf :: Env -> String -> IOThrowsError Integer
-precedenceOf env op = getPrecedence env op >>= liftThrows . extract
-
-operatorPrecedences = [11,10..0]
-defaultPrecedences = [("+", 5), ("-", 5),
-                      ("*", 4), ("/", 4), ("><", 6),
-                      ("=", 7), ("/=", 7), (">", 7), ("<", 7),
-                      ("<=", 7), (">=", 7), ("|", 8), ("&", 8),
-                      (":", 9), ("!", 9),
-                      (":=", 11), ("<-", 11)]
-
 -- Native functions:
 native :: Env -> String -> [TPLValue] -> IOThrowsError TPLValue
 native env name args = case lookup name natives of
@@ -165,7 +154,6 @@ definePattern env [List vals, List body] = do mapM defPair $ unify vals body
   where defPair (name, val) = define env name val
 definePattern env [List vals, body] = defineOp env [List vals, List [body]]
 
-  
 setOp :: TPLOperation
 setOp env [Id name, val]         = set env name val
 setOp env [List vals, List body] = do mapM setPair $ unify vals body
