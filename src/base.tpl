@@ -1,17 +1,6 @@
-not b := if (b) false else true;
+if cond $then $_ $else := with ['a' -> _if cond $then $else] $a
 
-a <= b := not (a > b);
-a >= b := a = b | a > b;
-a <  b := not (a >= b);
+let $bindings $body := with bindings body
 
-succ n := n + 1;
-pred n := n - 1;
+require 'base/list'
 
-let $bindings $body := with bindings body;
-
-load 'base/function'
-     'base/list'
-     'base/logic'
-     'base/math'
-     'base/control',
-     'base/string';
