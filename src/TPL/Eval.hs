@@ -23,11 +23,6 @@ readExp exp = case parse expressions "TPL" exp of
   Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
-eval env (If (Boolean condition) consequent alternate) = 
-  if condition then eval env consequent else eval env alternate
-eval env (If condition consequent alternate) = 
-  do condVal <- eval env condition >>= liftThrows . toBool
-     eval env $ If condVal consequent alternate
 eval env (Id id) = do res <- get env id
                       case res of
                         Lambda [] body           -> eval env body
@@ -97,7 +92,7 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, TPLOperation)]
-natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), 
+natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("require", require), 
            ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
            ("define", _define), ("set", _set), ("get", _get)] ++ map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
@@ -111,7 +106,15 @@ load env args = do args    <- mapM (liftThrows <<< extract <=< toString) args
                      [] -> Null
                      ls -> head ls
   where run file = liftIO (readFile file) >>= liftThrows . readExp >>= eval env
-
+        
+require :: TPLOperation
+require env [file] = do List current <- get env "_modules"
+                        String name  <- liftThrows $ toString file
+                        if String name `elem` current
+                          then return Null
+                          else do set env "_modules" . List $ (String name) : current
+                                  load env [file]
+                        
 defineOp :: TPLOperation
 defineOp env [Id name, val] = eval env val >>= define env name 
 defineOp env [Expression [left, Operator op, right], body] =
@@ -147,7 +150,7 @@ with env [List bindings, Function _ args body] =
   do let vars = mapM (toBinding . squash) bindings
      res <- vars >>= liftIO . bindVars env
      apply env (Function res args body) []
-  where toBinding (Expression [name, Operator "->", val]) = toBinding $ List [name, val]
+  where toBinding (Expression (name:(Operator "->"): vals)) = toBinding $ List [name, Expression vals]
         toBinding (List [id, val]) = do val  <- eval env val
                                         name <- extractId env id
                                         return (name, val)
@@ -184,6 +187,7 @@ getPrecedenceOp env [Expression [Operator op]] = getPrecedence env op
  
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
                   >>= (`bindVars` map (\(op, prec) -> ("precedenceOf" ++ op, Number prec)) defaultPrecedences)
+                  >>= (`bindVars` [("_modules", List [])])
 
 evalString :: Env -> String -> IO String
 evalString env exp = runIOThrows . liftM show $

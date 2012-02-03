@@ -14,7 +14,7 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
                 ("open", open), ("print", printTPL), ("substr", substr),
-                ("length", len)]
+                ("length", len), ("_if", ifTPL)]
 
 cons :: TPLOperation
 cons _ [head, List tail]          = return . List $ head : tail
@@ -44,4 +44,10 @@ len _ [String str] = return . Number $ genericLength str
 len _ [List ls]    = return . Number $ genericLength ls
 len e [exp]        = do str <- liftThrows $ toString exp
                         len e [str]
-                         
+                        
+ifTPL :: TPLOperation
+ifTPL _ [Boolean condition, consequent, alternate] = 
+  return $ if condition then consequent else alternate
+ifTPL env [condition, consequent, alternate] =
+  do cond <- liftThrows $ toBool condition
+     ifTPL env [cond, consequent, alternate]

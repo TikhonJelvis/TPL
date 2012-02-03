@@ -18,8 +18,7 @@ data TPLValue = Null
               | Sequence [TPLValue]
               | Lambda [TPLValue] TPLValue
               | Function Env [TPLValue] TPLValue 
-              | Native String
-              | If TPLValue TPLValue TPLValue deriving (Eq)
+              | Native String deriving (Eq)
                 
 showSeq vals = intercalate " " $ map show vals
 
@@ -38,9 +37,6 @@ instance Show TPLValue where
   show (Lambda [] body)         = "$(" ++ show body ++ ")"
   show (Function e params body) = showFun params body
   show (Lambda params body)     = showFun params body
-  show (If condition consequent alternate) = "{?if " ++ show condition ++
-                                             " then " ++ show consequent ++
-                                             " else " ++ show alternate ++ "?}"
 
 showFun :: [TPLValue] -> TPLValue -> String
 showFun params body = "λ " ++ showSeq params ++ " → " ++ show body
