@@ -1,72 +1,80 @@
-load 'base/function';
-load 'base/logic';
+require 'base/function'
+require 'base/logic'
 
-map fn [x, xs...] := if (is x) fn x : map fn xs else [];
+map fn [x, xs...] := if (is x) (fn x : map fn xs) else []
 
-fold fn base [x, xs...] := if (is x) fold fn (fn base x) xs else base;
-fold1 fn [x, xs...] := fold fn x xs;
+fold fn base [x, xs...] := x & (fold fn (fn base x) xs) | base
+fold1 fn [x, xs...] := fold fn x xs
 
-is x  := x /= null;
-isnt  := not . is;
-are   := fold (&) . map is;
+is x  := x /= null
+isnt  := not . is
+are   := fold (&) . map is
 
-a .. b := if (a > b) reverse @ b..a 
-   else if (a = b) [a] 
-   else            a : (succ a .. b);
+a .. b := if (a > b) {
+  reverse @ b..a 
+} else @ if (a = b) [a] else {
+    a : (succ a .. b)
+}
 
-[x, xs...] ! i := if (i) xs ! pred i else x;
+[x, xs...] ! i := if (i) {
+    xs ! pred i
+} else {
+    x
+}
 
-fn >> ls := map fn ls;
-ls << fn := fn >> ls;
+fn >> ls := map fn ls
+ls << fn := fn >> ls
 
-[x, xs...] ++ ls := if (is x) x : (xs ++ ls) else ls;
+[x, xs...] ++ ls := x & (x : (xs ++ ls)) | ls
 
-head [a] := a;
-tail [_, xs...] := xs;
-init [x1, x2, xs...] := if (is xs) [x1, x2] ++ init xs else if (is x2) x1 else [];
-last [x, xs...] := if (is xs) last xs else x;
+head [a] := a
+tail [_, xs...] := xs
 
-element ~> [x, xs...] := if (is x) (element = x) | (element ~> xs) else false;
+init [x1, x2, xs...] := if (is xs) {
+    [x1, x2] ++ init xs 
+} else @ if (is x2) x1 else []
+last [x, xs...] := if (is xs) {last xs} else x
 
-filter pred [x, xs...] := if (isnt x) []
-                     else if (pred x)   x : filter pred xs
-                     else               filter pred xs;
+element ~> [x, xs...] := x --> (element = x) | (element ~> xs)
 
-zipWith fn [x, xs...] [y, ys...] := if (are [x, y]) []
-                                  else fn x y : zipWith fn xs ys;
-zip := zipWith (:);
-unzip [[xs, ys]...] := [xs, ys];
+filter pred [x, xs...] := x & (pred x & x : filter pred xs | filter pred xs) | []
+
+zipWith fn [x, xs...] [y, ys...] := x & y & fn x y : zipWith fn xs ys | []
+zip := zipWith (:)
+unzip [[xs, ys]...] := [xs, ys]
 
 partitionBy pred ls := {
-  l := [];
-  r := [];
-  for x in  ls {
-      if (pred x) l <- x : l 
-    else          r <- x : r;
+  l := []
+  r := []
+  for x in ls {
+      pred x & l <- x : l | r <- x : r
   }
-  [l, r];
-};
+  [l, r]
+}
 
 groupBy fn ls := {
-  curr := null;
-  res  := [];
+  curr := null
+  res  := []
   for x in ls {
-    if (fn x = curr) res <- init res ++ [last res ++ [x]]
-    else             res <- res ++ [[x]];
-    curr <- fn x;
-  };
-  res;
-};
+    if (fn x = curr) {
+        res <- init res ++ [last res ++ [x]] 
+    } else {
+        res <- res ++ [[x]]
+    }
+    curr <- fn x
+  }
+  res
+}
 
-take n [x, xs...] := if (is x & n) x : take (n - 1) xs else [];
-drop n [x, xs...] := if (isnt x) [] else if (n) drop (n - 1) xs else x:xs;
-sub start end ls  := take (end - start) @ drop start ls;
+take n [x, xs...] := if (is x & n) {x : take (n - 1) xs} else []
+drop n [x, xs...] := x & (n & drop (n - 1) xs | x:xs) | []
+sub start end ls  := take (end - start) @ drop start ls
 
-reverse [x, xs...] := if (isnt x) [] else reverse xs ++ x;
+reverse [x, xs...] := x & reverse xs ++ x | []
 
-repeat x n := if (n) x : repeat x (n - 1) else [];
+repeat x n := n & (x : repeat x (n - 1)) | []
 
-and := fold1 (&);
-or  := fold1 (|);
+and := fold1 (&)
+or  := fold1 (|)
 
-none ls := filter id ls = [];
+none ls := filter id ls = []
