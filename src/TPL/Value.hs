@@ -1,4 +1,4 @@
-module TPL.Value where
+module TPL.Value (TPLValue(..), Env, nullEnv) where
 
 import Data.IORef
 import Data.List

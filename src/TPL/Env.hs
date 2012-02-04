@@ -1,4 +1,4 @@
-module TPL.Env where
+module TPL.Env (get, set, define, bindVars, getPrecedence, setPrecedence) where
 
 import Control.Applicative
 import Control.Monad.Error

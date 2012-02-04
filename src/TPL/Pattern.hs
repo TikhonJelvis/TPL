@@ -1,4 +1,4 @@
-module TPL.Pattern where
+module TPL.Pattern (unify, squash) where
 
 import TPL.Value
 

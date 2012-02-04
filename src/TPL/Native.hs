@@ -1,4 +1,4 @@
-module TPL.Native where
+module TPL.Native (eagerNatives, defaultPrecedences, operatorPrecedences, precedenceOf) where
 
 import Control.Applicative
 import Control.Arrow
