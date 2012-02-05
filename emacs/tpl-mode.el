@@ -19,11 +19,12 @@
 (defvar tpl-mode-map (make-keymap))
 (define-key tpl-mode-map (kbd "RET") 'tpl-condition-indent)
 (define-key tpl-mode-map (kbd "}") 'tpl-electric-brace)
+(define-key tpl-mode-map (kbd "]") 'tpl-electric-bracket)
 
 (defun init ()
   (set-syntax-table tpl-mode-syntax-table)
   (set (make-local-variable 'indent-line-function) 'tpl-indent-line)
-  (use-local-map cs164-mode-map))
+  (use-local-map tpl-mode-map))
 
 (defgroup tpl nil
   "Customization variables for the glorious tpl language mode."
@@ -101,7 +102,7 @@ point currently is on, and the associated indentation rules."
      (save-excursion
        (forward-line -1)
        (+ (current-indentation) cs164-basic-offset)))
-    ((current-line-matchesp "^[ \t]*}")
+    ((current-line-matchesp "^[ \t]*[]}]")
      (save-excursion
        (beginning-of-line)
        (backward-up-list)
@@ -122,15 +123,24 @@ point currently is on, and the associated indentation rules."
   (if tpl-indent-automatically
       (tpl-indent-line)))
 
-(defun tpl-electric-brace ()
-  "Inserts a } and indents if automatic indentation is on."
-  (interactive)
-  (insert "}")
+(defun tpl-electric-char (char)
+  (insert char)
   (if tpl-indent-automatically
-      (progn (if (current-line-matchesp "[ \t]*}[ \t]*")
+      (progn (if (current-line-matchesp (concat "[ \t]*" char "[ \t]*"))
                  (tpl-indent-line))
-             (if (equal (char-after) ?})
+             (if (equal (char-after) (string-to-char char))
                  (forward-char)))))
+
+(defun tpl-electric-brace ()
+  "Inserts a } and inents it as appropriate if
+tpl-indent-automatically is set to t."
+  (interactive)
+  (tpl-electric-char "}"))
+(defun tpl-electric-bracket ()
+  "Inserts a ] and inents it as appropriate if
+tpl-indent-automatically is set to t."
+  (interactive)
+  (tpl-electric-char "]"))
 
 (define-generic-mode 'tpl-mode
   ;; comment-list
