@@ -155,22 +155,7 @@ point currently is on, and the associated indentation rules."
   '(("\\b\\([0-9]+\\|null\\|true\\|false\\)\\b" . font-lock-constant-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)[ \t]*:=" 1 'font-lock-function-name-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)\\([ \t]+\\([_a-zA-Z0-9]+\\|\\[.*\\]\\)\\)+[ \t]*:=" 1 'font-lock-function-name-face)
-    ("[+-=*&^%#@!?/.|~<>:]+" . 'font-lock-type-face)
-    ("\\(->\\)" 
-     (1 (prog1 ()
-          (compose-region (match-beginning 1) (match-end 1) ?→)
-          (put-text-property (match-beginning 1) (match-end 1) 'font-lock-face 'font-lock-builtin-face))))
-    ("\\(<-\\)" 
-     (1 (prog1 ()
-          (compose-region (match-beginning 1) (match-end 1) ?←)
-          (put-text-property (match-beginning 1) (match-end 1) 'font-lock-face 'font-lock-builtin-face))))
-    ("\\(\\\\\\)" 
-     (1 (prog1 ()
-          (compose-region (match-beginning 1) (match-end 1) ?λ)
-          (put-text-property (match-beginning 1) (match-end 1) 'font-lock-face 'font-lock-builtin-face))))
-    ("\\(/=\\)" (1 (prog1 ()
-          (compose-region (match-beginning 1) (match-end 1) ?≠)
-          (put-text-property (match-beginning 1) (match-end 1) 'font-lock-face 'font-lock-builtin-face)))))
+    ("[+-=*&^%#@!?/.|~<>:]+" . 'font-lock-type-face))
   ;; auto-mode-alist
   '(".tpl\\'")
   ;; function-list
