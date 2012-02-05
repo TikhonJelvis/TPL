@@ -9,7 +9,7 @@ Name:                tpl
 Version:             0.1
 
 -- A short (one-line) description of the package.
-Synopsis:            A silly scriping language.
+Synopsis:            A silly little scriping language.
 
 -- A longer description of the package.
 -- Description:         
@@ -49,6 +49,7 @@ Library
   Hs-source-dirs:      src
   Exposed-modules:     TPL.Coerce, TPL.Env, TPL.Error, TPL.Eval, TPL.Native, 
                        TPL.Parse, TPL.Pattern, TPL.Run, TPL.Syntax, TPL.Value
+  GHC-options:         -Wall -fno-warn-unused-do-bind
 
 Executable tpl
   -- .hs or .lhs file containing the Main module.
