@@ -15,17 +15,18 @@ lexeme p = do res <- p
               whiteSpace
               return res
 
+idChar :: Parser Char
 idChar = letter <|> digit <|> oneOf "_"
 
-keyWord :: String -> CharParser st String
-keyWord str = lexeme $ do str <- try $ string str
+keyWord :: String -> Parser String
+keyWord str = lexeme $ do res <- try $ string str
                           notFollowedBy idChar
-                          return str
+                          return res
 
 specChar :: CharParser st Char
 specChar = spec <$> (oneOf "\"\\nt'"
                      <?> "valid escape character (\", n, t, \\, or ')")
-  where spec char = case char of
+  where spec character = case character of
           'n'  -> '\n'
           't'  -> '\t'
           c    ->  c -- All other characters are just themselves when escaped.
@@ -45,11 +46,13 @@ nullExp :: Parser TPLValue
 nullExp = keyWord "null" >> return Null
                
 identifier :: Parser TPLValue
-identifier = do head     <- letter <|> char '_'
+identifier = do first     <- letter <|> char '_'
                 contents <- many idChar
-                return . Id $ head:contents
+                return . Id $ first:contents
 
+operatorCharacters :: [Char]
 operatorCharacters = "+-=*&^%#@!?/.|~<>:"
+
 operator :: Parser TPLValue
 operator = Operator <$> many1 (oneOf operatorCharacters) 
 

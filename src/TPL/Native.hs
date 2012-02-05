@@ -1,7 +1,7 @@
 module TPL.Native (eagerNatives, defaultPrecedences, operatorPrecedences, precedenceOf) where
 
 import Control.Applicative
-import Control.Arrow
+import Control.Arrow ((<<<))
 import Control.Monad.Error
 
 import Data.List
@@ -11,6 +11,7 @@ import TPL.Env
 import TPL.Error
 import TPL.Value
 
+eagerNatives :: [(String, TPLOperation)]
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
@@ -20,7 +21,10 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
 precedenceOf :: Env -> String -> IOThrowsError Integer
 precedenceOf env op = getPrecedence env op >>= liftThrows . extract
 
+operatorPrecedences :: [Integer]
 operatorPrecedences = [11,10..0]
+
+defaultPrecedences :: Num a => [(String, a)]
 defaultPrecedences = [("+", 5), ("-", 5),
                       ("*", 4), ("/", 4), ("><", 6),
                       ("=", 7), ("/=", 7), (">", 7), ("<", 7),
@@ -29,12 +33,13 @@ defaultPrecedences = [("+", 5), ("-", 5),
                       (":=", 11), ("<-", 11)]
 
 cons :: TPLOperation
-cons _ [head, List tail]          = return . List $ head : tail
-cons _ [head, tail]               = return . List $ head : [tail]
+cons _ [first, List rest] = return . List $ first : rest
+cons _ [first, rest]      = return . List $ first : [rest]
+cons _ expr               = throwError $ BadNativeCall "(:)" expr
 
 open :: TPLOperation
-open _ args = do args   <- mapM (liftThrows <<< extract <=< toString) args
-                 result <- concat <$> mapM (liftIO . readFile) args
+open _ args = do res    <- mapM (liftThrows <<< extract <=< toString) args
+                 result <- concat <$> mapM (liftIO . readFile) res
                  return $ String result
 
 printTPL :: TPLOperation
@@ -50,10 +55,12 @@ substr env [str, start, end] = result >>= substr env
                                  start' <- toNumber start
                                  end'   <- toNumber end
                                  return $ [str', start', end']
+substr _ expr = throwError $ BadNativeCall "substr" expr
                                  
 len :: TPLOperation
 len _ [String str] = return . Number $ genericLength str
 len _ [List ls]    = return . Number $ genericLength ls
-len e [exp]        = do str <- liftThrows $ toString exp
-                        len e [str]
+len env [expr]     = do str <- liftThrows $ toString expr
+                        len env [str]
+len _ expr         = throwError $ BadNativeCall "len" expr
                          

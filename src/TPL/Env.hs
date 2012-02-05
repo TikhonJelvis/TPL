@@ -12,8 +12,6 @@ import TPL.Value
 exists :: Env -> String -> IO Bool
 exists env name = isJust . lookup name <$> readIORef env
 
-getRef env name = liftIO $ lookup name <$> readIORef env
-
 und :: String -> IOThrowsError TPLValue
 und = throwError . UndefinedVariable
 
@@ -25,8 +23,8 @@ set env name val = liftIO (lookup name <$> readIORef env) >>= maybe (und name)
                    (\ ref -> liftIO $ writeIORef ref val >> return val)
 
 define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
-define env name val = do exists <- liftIO (exists env name)
-                         if exists 
+define env name val = do bound <- liftIO (exists env name)
+                         if bound 
                            then set env name val >> return ()
                            else liftIO $ do value   <- newIORef val
                                             currEnv <- readIORef env
@@ -34,10 +32,11 @@ define env name val = do exists <- liftIO (exists env name)
                          return val
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
-bindVars env bindings = readIORef env >>= extend bindings >>= newIORef
-  where extend bindings env = (++ env) <$> mapM addBinding bindings
+bindVars env bindings = readIORef env >>= extended >>= newIORef
+  where extended newEnv = (++ newEnv) <$> mapM addBinding bindings
         addBinding (name, val) = newIORef val >>= \ ref -> return (name, ref)
 
+defaultPrecedence :: Num a => a
 defaultPrecedence = 10
 
 getPrecedence :: Env -> String -> IOThrowsError TPLValue

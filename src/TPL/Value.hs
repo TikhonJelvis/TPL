@@ -5,6 +5,7 @@ import Data.List
 
 type Env = IORef [(String, IORef TPLValue)]
 
+nullEnv :: IO Env
 nullEnv = newIORef []
 
 data TPLValue = Null
@@ -21,11 +22,12 @@ data TPLValue = Null
               | Native String
               | If TPLValue TPLValue TPLValue deriving (Eq)
                 
+showSeq :: Show a => [a] -> String
 showSeq vals = intercalate " " $ map show vals
 
 instance Show TPLValue where
   show (Null)                   = "null"
-  show (Id id)                  = id
+  show (Id name)                = name
   show (String str)             = str
   show (Number int)             = show int
   show (Operator name)          = name
@@ -34,9 +36,9 @@ instance Show TPLValue where
   show (Expression vals)        = "(" ++ showSeq vals ++ ")"
   show (Sequence vals)          = "{\n" ++ (unlines $ map show vals) ++ "}"
   show (Native name)            = "[<native> " ++ name ++ "]"
-  show (Function e [] body)     = "$(" ++ show body ++ ")"
+  show (Function _ [] body)     = "$(" ++ show body ++ ")"
   show (Lambda [] body)         = "$(" ++ show body ++ ")"
-  show (Function e params body) = showFun params body
+  show (Function _ params body) = showFun params body
   show (Lambda params body)     = showFun params body
   show (If condition consequent alternate) = "{?if " ++ show condition ++
                                              " then " ++ show consequent ++
