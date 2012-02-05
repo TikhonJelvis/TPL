@@ -19,6 +19,17 @@ readExpr expr = case parse expressions "TPL" expr of
   Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
+eval env (Id name) = do res <- get env name
+                        case res of
+                          Lambda [] body           -> eval env body
+                          Function closure [] body -> eval closure body
+                          expr                     -> eval env expr
+eval env val@(Expression _) = normalize env val >>= evalExpr
+  where evalExpr (Expression (fn@(Function{}) : args))     = apply env fn args
+        evalExpr (Expression ((Native name) : args))       = native env name args
+        evalExpr (Expression (fn : rest))                  = do res <- eval env fn
+                                                                evalExpr $ Expression (res : rest)
+        evalExpr value                                     = eval env value
 eval env (List vals)        = List <$> mapM (eval env) vals
 eval env (Sequence vals)    = Expression . return . last <$> mapM (eval env) vals
 eval env (Lambda args body) = return $ Function env args body
@@ -67,6 +78,7 @@ require env [file] = do List current <- get env "_modules"
                           then return Null
                           else do set env "_modules" . List $ (String name) : current
                                   load env [file]
+require _ expr = throwError $ BadNativeCall "require" expr
                         
 defineOp :: TPLOperation
 defineOp env [Id name, val] = eval env val >>= define env name 
@@ -137,14 +149,14 @@ setOp env [List vals, body] = setOp env [List vals, List [body]]
 setOp _ expr                = throwError $ BadNativeCall "set" expr
                                           
 setPrecedenceOp :: TPLOperation
-setPrecedenceOp env [Expression [Operator op], precedenceExpr] = 
+setPrecedenceOp env [Id op, precedenceExpr] = 
   do precedence <- eval env precedenceExpr >>= liftThrows . extract
      setPrecedence env op precedence
      return $ Number precedence
 setPrecedenceOp _ expr = throwError $ BadNativeCall "setPrecedence" expr
      
 getPrecedenceOp :: TPLOperation
-getPrecedenceOp env [Expression [Operator op]] = getPrecedence env op
+getPrecedenceOp env [Id op] = getPrecedence env op
 getPrecedenceOp _ expr = throwError $ BadNativeCall "precedenceOf" expr
  
 baseEnv :: IO Env

@@ -71,3 +71,4 @@ ifTPL _ [Boolean condition, consequent, alternate] =
 ifTPL env [condition, consequent, alternate] =
   do cond <- liftThrows $ toBool condition
      ifTPL env [cond, consequent, alternate]
+ifTPL _ expr = throwError $ BadNativeCall "_if" expr
