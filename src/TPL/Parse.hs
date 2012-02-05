@@ -59,7 +59,7 @@ operator :: Parser TPLValue
 operator = Operator <$> many1 (oneOf operatorCharacters) 
 
 list :: Parser TPLValue
-list = List <$> between (wLexeme $ char '[') (char ']') (expression `sepBy` wLexeme (char ','))
+list = List <$> between (wLexeme $ char '[') (char ']') (wLexeme expression `sepBy` wLexeme (char ','))
 
 lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
