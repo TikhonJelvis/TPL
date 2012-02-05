@@ -155,7 +155,7 @@ point currently is on, and the associated indentation rules."
   '(("\\b\\([0-9]+\\|null\\|true\\|false\\)\\b" . font-lock-constant-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)[ \t]*:=" 1 'font-lock-function-name-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)\\([ \t]+\\([_a-zA-Z0-9]+\\|\\[.*\\]\\)\\)+[ \t]*:=" 1 'font-lock-function-name-face)
-    ("[+-=*&^%#@!?/.|~<>:]+" . 'font-lock-type-face))
+    ("\\([-+=*&^%#@!?/.|~<>:]+\\)" 1 'font-lock-type-face))
   ;; auto-mode-alist
   '(".tpl\\'")
   ;; function-list
