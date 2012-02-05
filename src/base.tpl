@@ -1,4 +1,6 @@
-if cond $then $_ $else := with ['a' -> _if cond $then $else] $a
+force x := x
+
+if cond $then $_ $else := force (_if cond $then $else)
 
 let $bindings $body := with bindings body
 

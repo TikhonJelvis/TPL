@@ -47,17 +47,21 @@ filter pred [x, xs...] := is x --> if (pred x) {
     filter pred xs
 } | []
 
-zipWith fn [x, xs...] [y, ys...] := if (x & y) (fn x y : zipWith fn xs ys) else []
+zipWith fn [x, xs...] [y, ys...] := (x & y) --> (fn x y : zipWith fn xs ys) | []
 zip := zipWith (:)
 unzip [[xs, ys]...] := [xs, ys]
 
 partitionBy pred ls := {
-  l := []
-  r := []
-  for x in ls {
-      pred x & l <- x : l | r <- x : r
-  }
-  [l, r]
+    l := []
+    r := []
+    for x in ls {
+        if (pred x) {
+            l <- x : l
+        } else {
+            r <- x : r
+        }
+    }
+    [l, r]
 }
 
 groupBy fn ls := {
@@ -74,7 +78,7 @@ groupBy fn ls := {
   res
 }
 
-take n [x, xs...] := if (is x & n) {x : take (n - 1) xs} else []
+take n [x, xs...] := if (is x & n) (x : take (n - 1) xs) else []
 drop n [x, xs...] := x & (n & drop (n - 1) xs | x:xs) | []
 sub start end ls  := take (end - start) @ drop start ls
 
