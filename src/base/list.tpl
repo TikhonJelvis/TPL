@@ -1,7 +1,9 @@
+require 'base/control'
 require 'base/function'
 require 'base/logic'
+require 'base/math'
 
-map fn [x, xs...] := if (is x) (fn x : map fn xs) else []
+map fn [x, xs...] := is x --> (fn x : map fn xs) | []
 
 fold fn base [x, xs...] := x & (fold fn (fn base x) xs) | base
 fold1 fn [x, xs...] := fold fn x xs
@@ -10,11 +12,11 @@ is x  := x /= null
 isnt  := not . is
 are   := fold (&) . map is
 
-a .. b := if (a > b) {
-  reverse @ b..a 
-} else @ if (a = b) [a] else {
-    a : (succ a .. b)
-}
+a .. b := cond [
+    a > b -> reverse (b..a),
+    a = b -> [a],
+    true  -> a : (succ a .. b)
+]
 
 [x, xs...] ! i := if (i) {
     xs ! pred i
