@@ -2,6 +2,7 @@ require 'base/list'
 
 cond --> $result := if cond result else false
 precedence (-->) 7
+else := true
 
 $a -> $b := [$a, $b]
 precedence (->) 11

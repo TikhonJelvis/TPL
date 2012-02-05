@@ -32,16 +32,22 @@ ls << fn := fn >> ls
 head [a] := a
 tail [_, xs...] := xs
 
-init [x1, x2, xs...] := if (is xs) {
-    [x1, x2] ++ init xs 
-} else @ if (is x2) x1 else []
-last [x, xs...] := if (is xs) {last xs} else x
+init [x1, x2, xs...] := cond [
+    is xs -> [x1, x2] ++ init xs,
+    is x2 -> x1,
+    else  -> []
+]
+last [x, xs...] := xs --> last xs | x
 
-element ~> [x, xs...] := x --> (element = x) | (element ~> xs)
+element ~> [x, xs...] := x --> ((element = x) | (element ~> xs))
 
-filter pred [x, xs...] := x & (pred x & x : filter pred xs | filter pred xs) | []
+filter pred [x, xs...] := is x --> if (pred x) {
+    x : filter pred xs
+} else {
+    filter pred xs
+} | []
 
-zipWith fn [x, xs...] [y, ys...] := x & y & fn x y : zipWith fn xs ys | []
+zipWith fn [x, xs...] [y, ys...] := if (x & y) (fn x y : zipWith fn xs ys) else []
 zip := zipWith (:)
 unzip [[xs, ys]...] := [xs, ys]
 
