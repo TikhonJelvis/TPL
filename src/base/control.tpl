@@ -1,8 +1,10 @@
 require 'base/list'
 
 cond --> $result := if cond result else false
+precedence (-->) 7
 
 $a -> $b := [$a, $b]
+precedence (->) 11
 switch value [case, rest...] := {
   compare [cond, res] test := cond = test & res
   compare case value | (rest & switch value rest)
