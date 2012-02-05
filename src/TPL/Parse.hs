@@ -5,15 +5,20 @@ import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
 whiteSpace :: CharParser st ()
-whiteSpace = spaces
+whiteSpace = skipMany $ oneOf " \t"
 
-terminator :: CharParser st Char
-terminator = oneOf ";"
+terminator :: CharParser st ()
+terminator = (oneOf ";\n" >> return ()) <|> eof
 
 lexeme :: CharParser st a -> CharParser st a
 lexeme p = do res <- p
               whiteSpace
               return res
+              
+wLexeme :: CharParser st a -> CharParser st a
+wLexeme p = do res <- p
+               spaces
+               return res
 
 idChar :: Parser Char
 idChar = letter <|> digit <|> oneOf "_"
@@ -34,7 +39,7 @@ specChar = spec <$> (oneOf "\"\\nt'"
 stringLiteral :: Parser TPLValue
 stringLiteral = do opener   <- oneOf "\"'"
                    contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
-                   char opener
+                   char opener <?> "end of string"
                    return $ String contents
 bool :: Parser TPLValue
 bool = Boolean . (== "true") <$> (keyWord "true" <|> keyWord "false")
@@ -57,7 +62,7 @@ operator :: Parser TPLValue
 operator = Operator <$> many1 (oneOf operatorCharacters) 
 
 list :: Parser TPLValue
-list = List <$> between (lexeme $ char '[') (char ']') (expression `sepBy` lexeme (char ','))
+list = List <$> between (wLexeme $ char '[') (char ']') (wLexeme expression `sepBy` wLexeme (char ','))
 
 lambda :: Parser TPLValue
 lambda = do oneOf "\\λ"
@@ -69,29 +74,20 @@ lambda = do oneOf "\\λ"
         argument      = identifier <|> list
 
 expression :: Parser TPLValue
-expression = Expression <$> many1 atom
+expression = Expression <$> many1 atom <?> "expression"
 
+terminatedExpression :: Parser TPLValue
+terminatedExpression = do result <- expression
+                          try (wLexeme terminator) <|> lookAhead (char '}' >> return ())
+                          return result
+
+-- TODO: Rewrite the expression `sepBy` parser to end with a normal expression!
 block :: Parser TPLValue
-block = Sequence <$> between (lexeme $ char '{') (char '}') (expression `sepEndBy` lexeme terminator)
-
-ifStatement :: Parser TPLValue
-ifStatement = try $ do keyWord "if"
-                       condition <- lexeme parenExp
-                       (consequent, alternate) <- try blockElse <|> try expElse <|> ifOptBlock
-                       return $ If condition consequent alternate
-  where ifOptBlock = do body <- expression
-                        return (body, Null)
-        blockElse  = do consequent <- block
-                        keyWord "else"
-                        alternate <- expression
-                        return (consequent, alternate)
-        expElse    = do consequent <- lexeme $ manyTill atom (try $ string "else")
-                        alternate <- expression
-                        return (Expression consequent, alternate)
-        
+block = Sequence <$> between (wLexeme $ char '{') (char '}') code
+  where code = many terminatedExpression
 
 parenExp :: Parser TPLValue
-parenExp = between (lexeme $ char '(') (char ')') $ expression
+parenExp = between (wLexeme $ char '(') (char ')') $ expression
 
 delayedExp :: Parser TPLValue
 delayedExp = do char '$'
@@ -99,17 +95,16 @@ delayedExp = do char '$'
 
 atom :: Parser TPLValue
 atom = lexeme $ lambda
-            <|> ifStatement
-            <|> bool
-            <|> nullExp
-            <|> identifier
-            <|> stringLiteral
-            <|> number
-            <|> operator
-            <|> list
-            <|> parenExp
-            <|> block
-            <|> delayedExp
+             <|> bool
+             <|> nullExp
+             <|> identifier
+             <|> stringLiteral
+             <|> number
+             <|> operator
+             <|> list
+             <|> parenExp
+             <|> block
+             <|> delayedExp
 
 expressions :: Parser TPLValue
-expressions = Sequence <$> expression `sepEndBy` lexeme terminator
+expressions = Sequence <$> many terminatedExpression

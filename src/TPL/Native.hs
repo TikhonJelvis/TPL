@@ -16,7 +16,7 @@ eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
                 ("open", open), ("print", printTPL), ("substr", substr),
-                ("length", len)]
+                ("length", len), ("_if", ifTPL)]
 
 precedenceOf :: Env -> String -> IOThrowsError Integer
 precedenceOf env op = getPrecedence env op >>= liftThrows . extract
@@ -60,7 +60,14 @@ substr _ expr = throwError $ BadNativeCall "substr" expr
 len :: TPLOperation
 len _ [String str] = return . Number $ genericLength str
 len _ [List ls]    = return . Number $ genericLength ls
+
 len env [expr]     = do str <- liftThrows $ toString expr
                         len env [str]
 len _ expr         = throwError $ BadNativeCall "len" expr
-                         
+                        
+ifTPL :: TPLOperation
+ifTPL _ [Boolean condition, consequent, alternate] = 
+  return $ if condition then consequent else alternate
+ifTPL env [condition, consequent, alternate] =
+  do cond <- liftThrows $ toBool condition
+     ifTPL env [cond, consequent, alternate]

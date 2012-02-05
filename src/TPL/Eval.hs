@@ -19,22 +19,6 @@ readExpr expr = case parse expressions "TPL" expr of
   Right val -> return val
 
 eval :: Env -> TPLValue -> IOThrowsError TPLValue
-eval env (If (Boolean condition) consequent alternate) = 
-  if condition then eval env consequent else eval env alternate
-eval env (If condition consequent alternate) = 
-  do condVal <- eval env condition >>= liftThrows . toBool
-     eval env $ If condVal consequent alternate
-eval env (Id name) = do res <- get env name
-                        case res of
-                          Lambda [] body           -> eval env body
-                          Function closure [] body -> eval closure body
-                          expr                     -> eval env expr
-eval env val@(Expression _) = normalize env val >>= evalExpr
-  where evalExpr (Expression (fn@(Function{}) : args))     = apply env fn args
-        evalExpr (Expression ((Native name) : args))       = native env name args
-        evalExpr (Expression (fn : rest))                  = do res <- eval env fn
-                                                                evalExpr $ Expression (res : rest)
-        evalExpr value                                     = eval env value
 eval env (List vals)        = List <$> mapM (eval env) vals
 eval env (Sequence vals)    = Expression . return . last <$> mapM (eval env) vals
 eval env (Lambda args body) = return $ Function env args body
@@ -61,7 +45,7 @@ native env name args = case lookup name natives of
   Nothing -> throwError . UndefinedVariable $ name ++ " <native>"
   
 natives :: [(String, TPLOperation)]
-natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), 
+natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("require", require), 
            ("with", with), ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
            ("define", _define), ("set", _set), ("get", _get)] ++ map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
@@ -75,7 +59,15 @@ load env args = do eArgs    <- mapM (liftThrows <<< extract <=< toString) args
                      [] -> Null
                      ls -> head ls
   where run file = liftIO (readFile file) >>= liftThrows . readExpr >>= eval env
-
+        
+require :: TPLOperation
+require env [file] = do List current <- get env "_modules"
+                        String name  <- liftThrows $ toString file
+                        if String name `elem` current
+                          then return Null
+                          else do set env "_modules" . List $ (String name) : current
+                                  load env [file]
+                        
 defineOp :: TPLOperation
 defineOp env [Id name, val] = eval env val >>= define env name 
 defineOp env [Expression [left, Operator op, right], body] =
@@ -158,6 +150,7 @@ getPrecedenceOp _ expr = throwError $ BadNativeCall "precedenceOf" expr
 baseEnv :: IO Env
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
                   >>= (`bindVars` map (\(op, prec) -> ("precedenceOf" ++ op, Number prec)) defaultPrecedences)
+                  >>= (`bindVars` [("_modules", List [])])
 
 evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows . liftM show $
