@@ -4,10 +4,8 @@ module TPL.Coerce (TPLOperation,
                    toBool, toNumber, toString, 
                    extract, pack) where
 
-import Control.Arrow
 import Control.Monad.Error
 
-import TPL.Env
 import TPL.Error
 import TPL.Value
 
@@ -36,7 +34,7 @@ instance Extractable a => Extractable [a] where
 instance Packable a => Packable [a] where pack = List . map pack
 
 liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
-liftOp op = \ env [a, b] ->
+liftOp op = \ _ [a, b] ->
   do av <- liftThrows $ extract a
      bv <- liftThrows $ extract b
      return . pack $ op av bv
@@ -61,4 +59,4 @@ toBool b@(Boolean{}) = return b
 toBool Null          = return $ Boolean False
 toBool (Number 0)    = return $ Boolean False
 toBool (List [])     = return $ Boolean False
-toBool val           = return $ Boolean True
+toBool _             = return $ Boolean True
