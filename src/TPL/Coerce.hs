@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# LANGUAGE FlexibleInstances, OverlappingInstances#-}
 module TPL.Coerce (TPLOperation, 
                    liftOp, numOp, eqOp, strOp, eqNumOp,

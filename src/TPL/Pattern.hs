@@ -8,12 +8,13 @@ unify exprs vals = let exprs' = map squash exprs
                   zip exprs' vals' >>= unifyExpr
   where unifyExpr ((Id name), val)          = [(name, val)]
         unifyExpr ((List ls), (List val))   = case last ls of
-          Expression [pattern, Operator "..."] -> unify (init ls) (take len val) ++ unifyRest pattern (drop len val)
+          Lambda [Id "α"] (Expression [pattern, Operator "...", Id "α"]) ->
+            unify (init ls) (take len val) ++ unifyRest pattern (drop len val)
           _                                    -> unify ls val
           where len = length $ init ls
         unifyExpr (ls@(List _), val)        = unifyExpr (ls, List [val])
-        unifyExpr (Lambda _ expr, val)       = unifyExpr (expr, val)
-        unifyExpr (expr, val)                = unifyExpr (String $ show expr, val)
+        unifyExpr (Lambda _ expr, val)      = unifyExpr (expr, val)
+        unifyExpr (expr, val)               = unifyExpr (String $ show expr, val)
         unifyRest rest []   = unify [rest] [Null]
         unifyRest rest values = combine $ values >>= \ val -> unify [rest] [val]
         combine ((name, val):rest) = (name, List $ val : extract name rest) : 

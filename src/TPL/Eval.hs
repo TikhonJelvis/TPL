@@ -1,7 +1,6 @@
 module TPL.Eval (baseEnv, eval, evalString) where
 
 import Control.Applicative
-import Control.Arrow ((<<<))
 import Control.Monad.Error
 
 import TPL.Coerce
@@ -64,20 +63,17 @@ natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("r
         eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= op env)
 
 load :: TPLOperation
-load env args = do eArgs    <- mapM (liftThrows <<< extract <=< toString) args
-                   results <- mapM (run . (++ ".tpl")) eArgs
-                   return $ case results of 
-                     [] -> Null
-                     ls -> head ls
+load env [arg] = do filepath     <- liftThrows $ toString arg >>= extract
+                    List current <- get env "_modules"
+                    set env "_modules" . List $ (String filepath) : current
+                    run $ filepath ++ ".tpl"
   where run file = liftIO (readFile file) >>= liftThrows . readExpr >>= eval env
+load _ expr    = throwError $ BadNativeCall "load" expr
         
 require :: TPLOperation
 require env [file] = do List current <- get env "_modules"
-                        String name  <- liftThrows $ toString file
                         if String name `elem` current
-                          then return Null
-                          else do set env "_modules" . List $ (String name) : current
-                                  load env [file]
+                          then return Null else load env [file]
 require _ expr = throwError $ BadNativeCall "require" expr
                         
 defineOp :: TPLOperation
@@ -119,7 +115,7 @@ with env withArgs@[List bindings, Function _ args body] =
   do let vars = mapM (toBinding . squash) bindings
      res <- vars >>= liftIO . bindVars env
      apply env (Function res args body) []
-  where toBinding (Expression [name, Operator "->", val]) = toBinding $ List [name, val]
+  where toBinding (Expression [Id "->", name, val]) = toBinding $ List [name, val]
         toBinding (List [nameExp, val]) = do evalled  <- eval env val
                                              name <- extractId env nameExp
                                              return (name, evalled)
