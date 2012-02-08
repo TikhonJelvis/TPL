@@ -72,6 +72,7 @@ load _ expr    = throwError $ BadNativeCall "load" expr
         
 require :: TPLOperation
 require env [file] = do List current <- get env "_modules"
+                        String name <- liftThrows $ toString file
                         if String name `elem` current
                           then return Null else load env [file]
 require _ expr = throwError $ BadNativeCall "require" expr
@@ -111,9 +112,8 @@ _set env [expr, val] = do name <- extractId env expr
 _set _ args          = throwError $ BadNativeCall "set" args
 
 with :: TPLOperation
-with env withArgs@[List bindings, Function _ args body] = 
-  do let vars = mapM (toBinding . squash) bindings
-     res <- vars >>= liftIO . bindVars env
+with env withArgs@[List bindings, Function closure args body] = 
+  do res <- mapM (toBinding . squash) bindings >>= liftIO . bindVars closure
      apply env (Function res args body) []
   where toBinding (Expression [Id "->", name, val]) = toBinding $ List [name, val]
         toBinding (List [nameExp, val]) = do evalled  <- eval env val
