@@ -1,6 +1,6 @@
 module TPL.Parse (TPLValue (..), expressions, parse, operatorCharacters) where
 
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*), liftA2)
 import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
@@ -11,26 +11,19 @@ terminator :: CharParser st ()
 terminator = (oneOf ";\n" >> return ()) <|> eof
 
 lexeme :: CharParser st a -> CharParser st a
-lexeme p = do res <- p
-              whiteSpace
-              return res
+lexeme p = p <* whiteSpace
               
 wLexeme :: CharParser st a -> CharParser st a
-wLexeme p = do res <- p
-               spaces
-               return res
+wLexeme p = p <* spaces
 
 idChar :: Parser Char
 idChar = letter <|> digit <|> oneOf "_"
 
 keyWord :: String -> Parser String
-keyWord str = lexeme $ do res <- try $ string str
-                          notFollowedBy idChar
-                          return res
+keyWord str = lexeme $ try (string str) <* notFollowedBy idChar
 
 specChar :: CharParser st Char
-specChar = spec <$> (oneOf "\"\\nt'"
-                     <?> "valid escape character (\", n, t, \\, or ')")
+specChar = spec <$> (oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, or ')")
   where spec character = case character of
           'n'  -> '\n'
           't'  -> '\t'
@@ -41,6 +34,7 @@ stringLiteral = do opener   <- oneOf "\"'"
                    contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
                    char opener <?> "end of string"
                    return $ String contents
+
 bool :: Parser TPLValue
 bool = Boolean . (== "true") <$> (keyWord "true" <|> keyWord "false")
 
@@ -51,9 +45,7 @@ nullExp :: Parser TPLValue
 nullExp = keyWord "null" >> return Null
                
 identifier :: Parser TPLValue
-identifier = do first     <- letter <|> char '_'
-                contents <- many idChar
-                return . Id $ first:contents
+identifier = Id <$> liftA2 (:) (letter <|> char '_') (many idChar)
 
 operatorCharacters :: [Char]
 operatorCharacters = "+-=*&^%#@!?/.|~<>:"
@@ -81,17 +73,14 @@ terminatedExpression = do result <- expression
                           try (wLexeme terminator) <|> lookAhead (char '}' >> return ())
                           return result
 
--- TODO: Rewrite the expression `sepBy` parser to end with a normal expression!
 block :: Parser TPLValue
-block = Sequence <$> between (wLexeme $ char '{') (char '}') code
-  where code = many terminatedExpression
+block = Sequence <$> between (wLexeme $ char '{') (char '}') (many terminatedExpression)
 
 parenExp :: Parser TPLValue
 parenExp = between (wLexeme $ char '(') (char ')') $ expression
 
 delayedExp :: Parser TPLValue
-delayedExp = do char '$'
-                Lambda [] <$> atom
+delayedExp = char '$' >> Lambda [] <$> atom
 
 atom :: Parser TPLValue
 atom = lexeme $ lambda
