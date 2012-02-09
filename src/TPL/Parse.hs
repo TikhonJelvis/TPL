@@ -1,6 +1,6 @@
 module TPL.Parse (TPLValue (..), expressions, parse, operatorCharacters) where
 
-import Control.Applicative ((<$>), (<*), liftA2)
+import Control.Applicative ((<$>), (<$), (<*), (*>), liftA2)
 import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
@@ -8,7 +8,7 @@ whiteSpace :: CharParser st ()
 whiteSpace = skipMany $ oneOf " \t"
 
 terminator :: CharParser st ()
-terminator = (oneOf ";\n" >> return ()) <|> eof
+terminator = () <$ oneOf ";\n" <|> eof
 
 lexeme :: CharParser st a -> CharParser st a
 lexeme p = p <* whiteSpace
@@ -31,7 +31,7 @@ specChar = spec <$> (oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, 
     
 stringLiteral :: Parser TPLValue
 stringLiteral = do opener   <- oneOf "\"'"
-                   contents <- many $ (char '\\' >> specChar) <|> noneOf [opener]
+                   contents <- many $ (char '\\' *> specChar) <|> noneOf [opener]
                    char opener <?> "end of string"
                    return $ String contents
 
@@ -42,7 +42,7 @@ number :: Parser TPLValue
 number = Number . read <$> many1 digit <?> "number"
 
 nullExp :: Parser TPLValue
-nullExp = keyWord "null" >> return Null
+nullExp = Null <$ keyWord "null"
                
 identifier :: Parser TPLValue
 identifier = Id <$> liftA2 (:) (letter <|> char '_') (many idChar)
@@ -62,16 +62,14 @@ lambda = do oneOf "\\λ"
             lexeme $ string "->"
             body       <- expression
             return $ Lambda parameters body
-  where parameterList = whiteSpace >> many (lexeme argument)
+  where parameterList = whiteSpace *> many (lexeme argument)
         argument      = identifier <|> list
 
 expression :: Parser TPLValue
 expression = Expression <$> many1 atom <?> "expression"
 
 terminatedExpression :: Parser TPLValue
-terminatedExpression = do result <- expression
-                          try (wLexeme terminator) <|> lookAhead (char '}' >> return ())
-                          return result
+terminatedExpression = expression <* (wLexeme terminator <|> lookAhead (() <$ char '}'))
 
 block :: Parser TPLValue
 block = Sequence <$> between (wLexeme $ char '{') (char '}') (many terminatedExpression)
@@ -80,7 +78,7 @@ parenExp :: Parser TPLValue
 parenExp = between (wLexeme $ char '(') (char ')') $ expression
 
 delayedExp :: Parser TPLValue
-delayedExp = char '$' >> Lambda [] <$> atom
+delayedExp = char '$' *> (Lambda [] <$> atom)
 
 atom :: Parser TPLValue
 atom = lexeme $ lambda

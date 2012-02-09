@@ -8,9 +8,9 @@ map fn [x, xs...] := is x --> (fn x : map fn xs) | []
 fold fn base [x, xs...] := x & (fold fn (fn base x) xs) | base
 fold1 fn [x, xs...] := fold fn x xs
 
-is x  := x /= null
-isnt  := not . is
-are   := fold (&) . map is
+is x := x /= null
+isnt := not . is
+are  := fold (&) . map is
 
 a .. b := cond [
     a > b -> reverse (b..a),

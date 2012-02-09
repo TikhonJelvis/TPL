@@ -148,6 +148,8 @@ tpl-indent-automatically is set to t."
   ;; keyword-list
   '("if"
     "else"
+    "cond"
+    "switch"
     "for"
     "in"
     "while"
