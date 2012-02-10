@@ -30,7 +30,8 @@ eval env val@(Expression _) = normalize env val >>= evalExpr
                                                                 evalExpr $ Expression (res : rest)
         evalExpr value                                     = eval env value
 eval env (List vals)        = List <$> mapM (eval env) vals
-eval env (Sequence vals)    = Expression . return . last <$> mapM (eval env) vals
+eval _   (Sequence [])      = return Null
+eval env (Sequence vals)    = last <$> mapM (eval env) vals
 eval env (Lambda args body) = return $ Function env args body
 eval _ val                  = return val
 
@@ -157,7 +158,6 @@ getPrecedenceOp _ expr = throwError $ BadNativeCall "precedenceOf" expr
  
 baseEnv :: IO Env
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)
-                  >>= (`bindVars` map (\(op, prec) -> ("precedenceOf" ++ op, Number prec)) defaultPrecedences)
                   >>= (`bindVars` [("_modules", List [])])
 
 evalString :: Env -> String -> IO String

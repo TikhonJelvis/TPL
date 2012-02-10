@@ -1,4 +1,4 @@
-module TPL.Native (eagerNatives, defaultPrecedences, operatorPrecedences, precedenceOf) where
+module TPL.Native (eagerNatives, operatorPrecedences, precedenceOf) where
 
 import Control.Applicative
 import Control.Arrow ((<<<))
@@ -23,14 +23,6 @@ precedenceOf env op = getPrecedence env op >>= liftThrows . extract
 
 operatorPrecedences :: [Integer]
 operatorPrecedences = [11,10..0]
-
-defaultPrecedences :: Num a => [(String, a)]
-defaultPrecedences = [("+", 5), ("-", 5),
-                      ("*", 4), ("/", 4), ("><", 6),
-                      ("=", 7), ("/=", 7), (">", 7), ("<", 7),
-                      ("<=", 7), (">=", 7), ("|", 8), ("&", 8),
-                      (":", 9), ("!", 9),
-                      (":=", 11), ("<-", 11)]
 
 cons :: TPLOperation
 cons _ [first, List rest] = return . List $ first : rest

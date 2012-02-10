@@ -3,9 +3,9 @@ require 'base/function'
 require 'base/logic'
 require 'base/math'
 
-map fn [x, xs...] := is x --> (fn x : map fn xs) | []
+map fn [x, xs...] := is x ? fn x : map fn xs @ []
 
-fold fn base [x, xs...] := x & (fold fn (fn base x) xs) | base
+fold fn base [x, xs...] := is x ? fold fn (fn base x) xs @ base
 fold1 fn [x, xs...] := fold fn x xs
 
 is x := x /= null
@@ -18,16 +18,12 @@ a .. b := cond [
     true  -> a : (succ a .. b)
 ]
 
-[x, xs...] ! i := if (i) {
-    xs ! pred i
-} else {
-    x
-}
+[x, xs...] ! i := i ? xs ! pred i @ x
 
 fn >> ls := map fn ls
 ls << fn := fn >> ls
 
-[x, xs...] ++ ls := x & (x : (xs ++ ls)) | ls
+[x, xs...] ++ ls := is x ? (x : (xs ++ ls)) @ ls
 
 head [a] := a
 tail [_, xs...] := xs
@@ -37,17 +33,18 @@ init [x1, x2, xs...] := cond [
     is x2 -> x1,
     else  -> []
 ]
-last [x, xs...] := xs --> last xs | x
+last [x, xs...] := is xs ? last xs @ x
 
-element ~> [x, xs...] := x --> ((element = x) | (element ~> xs))
+element ~> [x, xs...] := is x --> element = x | element ~> xs
+precedence (~>) 7
 
-filter pred [x, xs...] := is x --> if (pred x) {
-    x : filter pred xs
-} else {
-    filter pred xs
-} | []
+filter pred [x, xs...] := cond [
+    is x & pred x -> x : filter pred xs,
+    is x          -> filter pred xs,
+    else          -> []
+]
 
-zipWith fn [x, xs...] [y, ys...] := (x & y) --> (fn x y : zipWith fn xs ys) | []
+zipWith fn [x, xs...] [y, ys...] := (is x & is y) ? (fn x y : zipWith fn xs ys) @ []
 zip := zipWith (:)
 unzip [[xs, ys]...] := [xs, ys]
 
@@ -56,9 +53,9 @@ partitionBy pred ls := {
     r := []
     for x in ls {
         if (pred x) {
-            l <- x : l
+            l <- l ++ [x]
         } else {
-            r <- x : r
+            r <- r ++ [x]
         }
     }
     [l, r]
@@ -78,11 +75,15 @@ groupBy fn ls := {
   res
 }
 
-take n [x, xs...] := if (is x & n) (x : take (n - 1) xs) else []
-drop n [x, xs...] := x & (n & drop (n - 1) xs | x:xs) | []
+take n [x, xs...] := if (is x & n) {
+    x : take (n - 1) xs
+} else {
+    []
+}
+drop n [x, xs...] := is x & n ? drop (n - 1) xs @ x:xs
 sub start end ls  := take (end - start) @ drop start ls
 
-reverse [x, xs...] := x & reverse xs ++ x | []
+reverse [x, xs...] := is x ? (reverse xs ++ x) @ []
 
 repeat x n := n & (x : repeat x (n - 1)) | []
 

@@ -2,7 +2,7 @@ require 'base/function'
 require 'base/list'
 require 'base/logic'
 
-a // b  := a - (a / b * b)
+a // b := a - (a / b * b)
 even n := (n % 2) = 0
 odd    := not . even
 

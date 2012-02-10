@@ -63,7 +63,7 @@ lambda = do oneOf "\\λ"
             body       <- expression
             return $ Lambda parameters body
   where parameterList = whiteSpace *> many (lexeme argument)
-        argument      = identifier <|> list
+        argument      = identifier <|> list <|> delayedExp
 
 expression :: Parser TPLValue
 expression = Expression <$> many1 atom <?> "expression"
