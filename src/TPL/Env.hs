@@ -3,6 +3,7 @@ module TPL.Env (get, set, define, bindVars, getPrecedence, setPrecedence) where
 import Control.Applicative
 import Control.Monad.Error
 
+import qualified Data.Map as M
 import Data.Maybe
 import Data.IORef
 
@@ -10,16 +11,16 @@ import TPL.Error
 import TPL.Value
 
 exists :: Env -> String -> IO Bool
-exists env name = isJust . lookup name <$> readIORef env
+exists env name = M.member name <$> readIORef env
 
 und :: String -> IOThrowsError TPLValue
 und = throwError . UndefinedVariable
 
 get :: Env -> String -> IOThrowsError TPLValue
-get env name = liftIO (lookup name <$> readIORef env) >>= maybe (und name) (liftIO . readIORef)
-       
+get env name = M.lookup name <$> liftIO (readIORef env) >>= maybe (und name) return 
+
 set :: Env -> String -> TPLValue -> IOThrowsError TPLValue
-set env name val = liftIO (lookup name <$> readIORef env) >>= maybe (und name)
+set env name val = liftIO (M.lookup name <$> readIORef env) >>= maybe (und name)
                    (\ ref -> liftIO $ writeIORef ref val >> return val)
 
 define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
@@ -28,7 +29,7 @@ define env name val = do bound <- liftIO (exists env name)
                            then set env name val >> return ()
                            else liftIO $ do value   <- newIORef val
                                             currEnv <- readIORef env
-                                            writeIORef env $ (name, value) : currEnv
+                                            writeIORef env $ M.insert name val currEnv
                          return val
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
