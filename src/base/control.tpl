@@ -16,7 +16,7 @@ switch value [case, rest...] := {
 }
 cond [[condition, result], rest...] := condition ? result @ cond rest
 
-for $x $in ls $body := map (\ item -> with [x -> item] body) ls
+for $x $in ls $body := map (λ item -> with [x -> item] body) ls
 
 while $condition $body := condition ? body : while condition body @ []
 do $body $while $condition := body : (condition & while condition body) | []

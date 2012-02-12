@@ -6,9 +6,16 @@ a // b := a - (a / b * b)
 even n := (n % 2) = 0
 odd    := not . even
 
+precedence (>) 7
+
 a <= b := not (a > b)
+precedence (<=) 7
+
 a >= b := a = b | a > b
+precedence (>=) 7
+
 a <  b := not (a >= b)
+precedence (<)  7
 
 succ n := n + 1
 pred n := n - 1
