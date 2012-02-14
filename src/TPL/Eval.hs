@@ -64,9 +64,11 @@ natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("r
         eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= op env)
 
 load :: TPLOperation
-load env [arg] = do filepath     <- liftThrows $ toString arg >>= extract
+load env [arg] = do filename     <- liftThrows $ toString arg >>= extract
+                    path         <- get env "TPL_PATH" >>= liftThrows . (extract <=< toString)
+                    let filepath = path ++ "/" ++ filename
                     List current <- get env "_modules"
-                    set env "_modules" . List $ (String filepath) : current
+                    set env "_modules" . List $ (String filename) : current
                     run $ filepath ++ ".tpl"
   where run file = liftIO (readFile file) >>= liftThrows . readExpr >>= eval env
 load _ expr    = throwError $ BadNativeCall "load" expr
