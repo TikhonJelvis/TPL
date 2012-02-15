@@ -12,13 +12,12 @@ import TPL.Value
 
 type TPLOperation = Env -> [TPLValue] -> IOThrowsError TPLValue
 
--- Takes a function on TPLValues and makes it coerce to the given type.
 class Extractable a where extract :: TPLValue -> ThrowsError a
 class Packable a where pack :: a -> TPLValue
   
 instance Extractable Integer where
   extract (Number n) = return n
-  extract num = toNumber num >>= extract
+  extract num        = toNumber num >>= extract
 instance Packable Integer where pack = Number
                             
 instance Extractable [Char] where extract = return . show
@@ -35,10 +34,9 @@ instance Extractable a => Extractable [a] where
 instance Packable a => Packable [a] where pack = List . map pack
 
 liftOp :: (Extractable a, Extractable b, Packable c) => (a -> b -> c) -> TPLOperation
-liftOp op = \ _ [a, b] ->
-  do av <- liftThrows $ extract a
-     bv <- liftThrows $ extract b
-     return . pack $ op av bv
+liftOp op = \ _ [a, b] -> liftThrows $ do av <- extract a
+                                          bv <- extract b
+                                          return . pack $ op av bv
 numOp   = liftOp :: (Integer -> Integer -> Integer) -> TPLOperation
 eqOp    = liftOp :: (String -> String -> Bool) -> TPLOperation
 eqNumOp = liftOp :: (Integer -> Integer -> Bool) -> TPLOperation
@@ -60,4 +58,5 @@ toBool b@(Boolean{}) = return b
 toBool Null          = return $ Boolean False
 toBool (Number 0)    = return $ Boolean False
 toBool (List [])     = return $ Boolean False
+toBool (String str)  = return . Boolean . not $ str `elem` ["", "0"]
 toBool _             = return $ Boolean True
