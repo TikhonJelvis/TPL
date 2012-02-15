@@ -12,7 +12,7 @@ $a -> $b := [$a, $b]
 precedence (->) 11
 switch value [case, rest...] := {
   compare [condition, res] test := condition = test --> res
-  compare case value | is rest --> switch value rest
+  compare case value | (is rest --> switch value rest)
 }
 cond [[condition, result], rest...] := condition ? result @ cond rest
 
