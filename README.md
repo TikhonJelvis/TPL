@@ -24,8 +24,8 @@ One of the core tenants of TPL is flexibility: you should be able to meaningfull
 
 You could want to add your own control structures. For example, the language does not have any sort of `switch` statement by default. Happily, you can write one yourself:
 
-    $case -> $result := \ x -> if (x = case) result;
-    switch value [case, rest...] := case value | (rest & switch value rest)
+    $case -> $result := \ x -> (x = case) --> result
+    switch value [case, rest...] := case value | (is rest --> switch value rest)
 
 This could then be used like this:
 
@@ -33,15 +33,15 @@ This could then be used like this:
       1 -> "one",
       2 -> "two",
       3 -> "three"
-    ];
+    ]
 
 You can also use dynamic scoping using the `with` native function, if you want. For example:
 
-    for $x $in ls $body := map (\ item -> with [x -> item] body) ls;
+    for $x $in ls $body := map (\ item -> with [x -> item] body) ls
     for i in (1..10) {
-      a := i + 1;
-      b := i - 1;
-      print @ b >< " " >< i >< " " >< c;
+      a := i + 1
+      b := i - 1
+      print @ "a:%s b:%s i:%s" % [a, b, i]
     };
 
 Here `x` holds a *variable name* and `with` is used to set whatever `x` is to whatever `item` is inside of `body`. This means that whatever id `x` holds is dynamically typed. Magic!
