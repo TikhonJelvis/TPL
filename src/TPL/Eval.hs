@@ -95,8 +95,8 @@ extractId env (Id name)                 = do res <- get env name
                                                Id str -> return str
                                                _      -> extractId env res
 extractId _ (String str)              = return str
-extractId _ (Lambda [] (Id name))     = return name 
 extractId _ (Function _ [] (Id name)) = return name
+extractId env (Function _ [] val)     = extractId env val
 extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
 
 _get :: TPLOperation
@@ -119,8 +119,8 @@ with env withArgs@[List bindings, Function closure args body] =
   do res <- mapM (toBinding . squash) bindings >>= liftIO . bindVars closure
      apply env (Function res args body) []
   where toBinding (Expression [Id "->", name, val]) = toBinding $ List [name, val]
-        toBinding (List [nameExp, val]) = do evalled  <- eval env val
-                                             name <- extractId env nameExp
+        toBinding (List [nameExp, val]) = do evalled <- eval env val
+                                             name    <- extractId env nameExp
                                              return (name, evalled)
         toBinding _ = throwError $ BadNativeCall "with" withArgs
 with env [bindings, Id name] = do val <- get env name

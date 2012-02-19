@@ -1,5 +1,7 @@
 force x := x
 
+print x := _print x
+
 precedence (+)  5
 precedence (-)  5
 precedence (*)  4

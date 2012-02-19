@@ -84,7 +84,7 @@ delayedExp :: Parser TPLValue
 delayedExp = char '$' *> (Lambda [] <$> atom)
 
 atom :: Parser TPLValue
-atom = lexeme $ lambda
+atom = lexeme $  lambda
              <|> bool
              <|> nullExp
              <|> identifier
