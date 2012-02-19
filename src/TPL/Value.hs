@@ -4,10 +4,10 @@ import Data.IORef
 import Data.List
 import qualified Data.Map as M
 
-type Env = M.Map String TPLValue
+type Env = IORef (M.Map String TPLValue)
 
 nullEnv :: IO Env
-nullEnv = newIORef $ M.null
+nullEnv = newIORef $ M.empty
 
 data TPLValue = Null
               | Id String
@@ -41,7 +41,7 @@ instance Show TPLValue where
   show (Function _ params body) = showFun params body
   show (Lambda params body)     = showFun params body
   show (Native name)            = "[<native> " ++ name ++ "]"
-  show (Env e)                  = show e
+  show (Env _)                  = "<env>"
 
 showFun :: [TPLValue] -> TPLValue -> String
 showFun params body = "λ " ++ showSeq params ++ " → " ++ show body
