@@ -35,7 +35,9 @@ define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
 define ref name val = setLocal ref name val <|> update ref name val
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
-bindVars ref bindings = M.union (M.fromList bindings) <$> readIORef ref >>= newIORef
+bindVars ref bindings = let parent = pack ref
+                            newEnv = M.insert "*parent*" parent $ M.fromList bindings in
+                        newIORef newEnv
 
 defaultPrecedence :: TPLValue
 defaultPrecedence = Number 10
