@@ -7,6 +7,9 @@ module TPL.Coerce (TPLOperation,
 
 import Control.Monad.Error
 
+import Data.IORef (IORef)
+import Data.Map (Map)
+
 import TPL.Error
 import TPL.Value
 
@@ -28,7 +31,12 @@ instance Extractable Bool where
   extract (Boolean bool)  = return bool
   extract val             = toBool val >>= extract
 instance Packable Bool where pack = Boolean
-                             
+                                          
+instance Extractable (IORef (Map String TPLValue)) where
+  extract (Env env) = return env
+  extract expr      = throwError . TypeMismatch "env" $ show expr
+instance Packable (IORef (Map String TPLValue)) where pack = Env
+
 instance Extractable a => Extractable [a] where
   extract (List vals) = sequence $ map extract vals
   extract value       = sequence [extract value]
