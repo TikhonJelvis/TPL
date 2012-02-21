@@ -1,5 +1,7 @@
 module TPL.Run (repl, runFile) where
  
+import System.Directory
+import System.Environment
 import System.IO
 
 import TPL.Eval
@@ -18,8 +20,12 @@ until_ predicate prompt action =
        then return ()
        else action result >> until_ predicate prompt action
 
-repl :: IO ()
-repl = baseEnv >>= until_ (== "quit") (readPrompt "~>") . evalAndPrint
+repl :: IO () 
+repl = do env  <- baseEnv
+          path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
+          evalString env $ "TPL_PATH := '" ++ path ++ "'"
+          evalString env "load 'base'"
+          until_ (== "quit") (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path

@@ -15,7 +15,7 @@ eagerNatives :: [(String, TPLOperation)]
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
-                ("open", open), ("print", printTPL), ("substr", substr),
+                ("open", open), ("_print", _print), ("substr", substr),
                 ("length", len), ("_if", ifTPL)]
 
 precedenceOf :: Env -> String -> IOThrowsError Integer
@@ -34,8 +34,8 @@ open _ args = do res    <- mapM (liftThrows <<< extract <=< toString) args
                  result <- concat <$> mapM (liftIO . readFile) res
                  return $ String result
 
-printTPL :: TPLOperation
-printTPL _ args = mapM (liftIO . putStrLn . show) args >> return Null
+_print :: TPLOperation
+_print _ args = mapM (liftIO . putStrLn . show) args >> return Null
 
 substr :: TPLOperation
 substr _ [String str, Number start, Number end] =

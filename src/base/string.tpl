@@ -11,7 +11,7 @@ str % vals := {
             '%' -> {vals <- val:vals; '%'},
             's' -> val,
             'd' -> val * 1
-        ] >< (is chars ? process chars vals @ '') 
+        ] >< (is chars ? process chars vals @ '')
     } else {
         c1 >< (is c2 ? process (c2:chars) (val:vals) @ '')
     }

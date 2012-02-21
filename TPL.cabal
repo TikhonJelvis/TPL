@@ -45,7 +45,7 @@ Build-type:          Simple
 Cabal-version:       >=1.9.2
 
 Library
-  Build-depends:       base, containers, parsec >= 3, mtl
+  Build-depends:       base, containers, directory, mtl, parsec >= 3
   Hs-source-dirs:      src
   Exposed-modules:     TPL.Coerce, TPL.Env, TPL.Error, TPL.Eval, TPL.Native, 
                        TPL.Parse, TPL.Pattern, TPL.Run, TPL.Syntax, TPL.Value

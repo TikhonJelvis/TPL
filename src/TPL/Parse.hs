@@ -44,14 +44,17 @@ number = Number . read <$> many1 digit <?> "number"
 nullExp :: Parser TPLValue
 nullExp = Null <$ keyWord "null"
                
+name :: Parser String
+name = liftA2 (:) (letter <|> char '_') (many idChar)
+
 identifier :: Parser TPLValue
-identifier = Id <$> liftA2 (:) (letter <|> char '_') (many idChar)
+identifier = Id <$> name
 
 operatorCharacters :: [Char]
 operatorCharacters = "+-=*&^%#@!?/.|~<>:"
 
 operator :: Parser TPLValue
-operator = Operator <$> many1 (oneOf operatorCharacters) 
+operator = Operator <$> (many1 (oneOf operatorCharacters) <|> char '`' *> name <* char '`')
 
 list :: Parser TPLValue
 list = List <$> between (wLexeme $ char '[') (char ']') (wLexeme expression `sepBy` wLexeme (char ','))
@@ -81,7 +84,7 @@ delayedExp :: Parser TPLValue
 delayedExp = char '$' *> (Lambda [] <$> atom)
 
 atom :: Parser TPLValue
-atom = lexeme $ lambda
+atom = lexeme $  lambda
              <|> bool
              <|> nullExp
              <|> identifier
