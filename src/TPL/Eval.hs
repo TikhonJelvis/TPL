@@ -3,6 +3,8 @@ module TPL.Eval (baseEnv, eval, evalString) where
 import Control.Applicative
 import Control.Monad.Error
 
+import Data.IORef (readIORef)
+
 import TPL.Coerce
 import TPL.Env
 import TPL.Error
@@ -163,5 +165,7 @@ baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) native
                   >>= (`bindVars` [("_modules", List [])])
 
 evalString :: Env -> String -> IO String
-evalString env expr = runIOThrows . liftM show $
-                     squash <$> liftThrows (readExpr expr) >>= eval env
+evalString env expr = runIOThrows $ do res <- squash <$> liftThrows (readExpr expr) >>= eval env
+                                       case res of
+                                         Env ref -> show <$> liftIO (readIORef ref)
+                                         _       -> return $ show res

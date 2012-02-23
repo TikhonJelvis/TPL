@@ -25,9 +25,11 @@ setLocal ref name val = do maybeVal <- M.lookup name <$> liftIO (readIORef ref)
                            if isJust maybeVal then update ref name val else und name
 
 get :: Env -> String -> IOThrowsError TPLValue
+get ref "*current*" = return $ Env ref
 get ref name = getLocal ref name <|> (getLocal ref "*parent*" >>= liftThrows . extract >>= (`get` name)) <|> und name
 
 set :: Env -> String -> TPLValue -> IOThrowsError TPLValue
+set _ "*current*" _ = throwError $ Default "Cannot change the current environment"
 set ref name val = setLocal ref name val <|> do parent <- get ref "*parent*" >>= liftThrows . extract
                                                 set parent name val
 
