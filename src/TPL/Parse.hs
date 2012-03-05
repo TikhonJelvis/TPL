@@ -72,13 +72,10 @@ expression :: Parser TPLValue
 expression = Expression <$> many1 atom <?> "expression"
 
 terminatedExpression :: Parser TPLValue
-terminatedExpression = expression <* (wLexeme terminator <|> lookAhead (() <$ char '}'))
+terminatedExpression = expression <* (wLexeme terminator <|> lookAhead (() <$ char ')'))
 
 block :: Parser TPLValue
-block = Sequence <$> between (wLexeme $ char '{') (char '}') (many terminatedExpression)
-
-parenExp :: Parser TPLValue
-parenExp = between (wLexeme $ char '(') (char ')') $ expression
+block = Sequence <$> between (wLexeme $ char '(') (char ')') (many terminatedExpression)
 
 delayedExp :: Parser TPLValue
 delayedExp = char '$' *> (Lambda [] <$> atom)
@@ -92,7 +89,6 @@ atom = lexeme $  lambda
              <|> number
              <|> operator
              <|> list
-             <|> parenExp
              <|> block
              <|> delayedExp
 

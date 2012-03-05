@@ -48,38 +48,38 @@ zipWith fn [x, xs...] [y, ys...] := (is x & is y) ? (fn x y : zipWith fn xs ys) 
 zip := zipWith (:)
 unzip [[xs, ys]...] := [xs, ys]
 
-partitionBy pred ls := {
+partitionBy pred ls := (
     l := []
     r := []
-    for x in ls {
-        if (pred x) {
+    for x in ls (
+        if (pred x) (
             l <- l ++ [x]
-        } else {
+        ) else (
             r <- r ++ [x]
-        }
-    }
+        )
+    )
     [l, r]
-}
+)
 
-groupBy fn ls := {
+groupBy fn ls := (
   curr := null
   res  := []
-  for x in ls {
-    if (fn x = curr) {
+  for x in ls (
+    if (fn x = curr) (
         res <- init res ++ [last res ++ [x]] 
-    } else {
+    ) else (
         res <- res ++ [[x]]
-    }
+    )
     curr <- fn x
-  }
+  )
   res
-}
+)
 
-take n [x, xs...] := if (is x & n) {
+take n [x, xs...] := if (is x & n) (
     x : take (n - 1) xs
-} else {
+) else (
     []
-}
+)
 drop n [x, xs...] := is x & n ? drop (n - 1) xs @ x:xs
 sub start end ls  := take (end - start) @ drop start ls
 

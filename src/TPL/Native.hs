@@ -56,7 +56,7 @@ len _ [List ls]    = return . Number $ genericLength ls
 len env [expr]     = do str <- liftThrows $ toString expr
                         len env [str]
 len _ expr         = throwError $ BadNativeCall "len" expr
-                        
+
 ifTPL :: TPLOperation
 ifTPL _ [Boolean condition, consequent, alternate] = 
   return $ if condition then consequent else alternate

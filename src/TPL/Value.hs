@@ -28,7 +28,7 @@ showSeq vals = intercalate " " $ map show vals
 
 instance Show TPLValue where
   show (Null)                   = "null"
-  show (Id name)                = name
+  show (Id name)                = "id: " ++ name
   show (String str)             = str
   show (Number int)             = show int
   show (Operator name)          = name
