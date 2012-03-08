@@ -11,10 +11,10 @@ terminator :: CharParser st ()
 terminator = () <$ oneOf ";\n" <|> eof
 
 lexeme :: CharParser st a -> CharParser st a
-lexeme p = p <* whiteSpace
+lexeme = (<* whiteSpace)
               
 wLexeme :: CharParser st a -> CharParser st a
-wLexeme p = p <* spaces
+wLexeme = (<* spaces)
 
 idChar :: Parser Char
 idChar = letter <|> digit <|> oneOf "_"
@@ -80,8 +80,16 @@ block = Sequence <$> between (wLexeme $ char '(') (char ')') (many terminatedExp
 delayedExp :: Parser TPLValue
 delayedExp = char '$' *> (Lambda [] <$> atom)
 
+objLit :: Parser TPLValue
+objLit = ObjLit <$> (wLexeme (char '{') *> pair `sepBy` separator <* wLexeme (char '}'))
+  where separator = lexeme $ terminator <|> () <$ char ','
+        pair = do name <- wLexeme $ identifier <|> number <|> stringLiteral
+                  val  <- wLexeme (char ':') *> atom
+                  return (name, val)
+
 atom :: Parser TPLValue
 atom = lexeme $  lambda
+             <|> objLit
              <|> bool
              <|> nullExp
              <|> identifier

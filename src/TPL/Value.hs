@@ -20,6 +20,7 @@ data TPLValue = Null
               | Sequence [TPLValue]
               | Lambda [TPLValue] TPLValue
               | Function Env [TPLValue] TPLValue 
+              | ObjLit [(TPLValue, TPLValue)]
               | Env Env 
               | Native String deriving (Eq)
                 
@@ -41,7 +42,8 @@ instance Show TPLValue where
   show (Function _ params body) = showFun params body
   show (Lambda params body)     = showFun params body
   show (Native name)            = "[<native> " ++ name ++ "]"
-  show (Env _)                  = "[<env>]"
+  show Env{}                    = "[<env>]"
+  show (ObjLit bindings)        = show bindings
 
 showFun :: [TPLValue] -> TPLValue -> String
 showFun params body = "λ " ++ showSeq params ++ " → " ++ show body
