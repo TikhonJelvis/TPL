@@ -3,6 +3,9 @@ module TPL.Eval (baseEnv, eval, evalString) where
 import Control.Applicative
 import Control.Monad.Error
 
+import Data.Map (fromList)
+import Data.IORef
+
 import TPL.Coerce
 import TPL.Env
 import TPL.Error
@@ -33,6 +36,9 @@ eval env (List vals)        = List <$> mapM (eval env) vals
 eval _   (Sequence [])      = return Null
 eval env (Sequence vals)    = last <$> mapM (eval env) vals
 eval env (Lambda args body) = return $ Function env args body
+eval env (ObjLit bindings)  = do ref <- newIORef . fromList <$> mapM evalBinding bindings
+                                 Env <$> liftIO ref
+  where evalBinding (s,v) = (,) s <$> eval env v
 eval _ val                  = return val
 
 apply :: Env -> TPLValue -> [TPLValue] -> IOThrowsError TPLValue
@@ -101,9 +107,13 @@ extractId env (Function _ [] val)     = extractId env val
 extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
 
 _get :: TPLOperation
-_get env [expr] = do name <- extractId env expr
-                     get env name
-_get _ args     = throwError $ BadNativeCall "get" args
+_get env [expr]            = do name <- extractId env expr
+                                get env name
+_get env a@[envExpr, expr] = do res <- eval env envExpr
+                                case res of
+                                  Env env' -> _get env' [expr]
+                                  _        -> throwError $ BadNativeCall "get" a
+_get _ args                = throwError $ BadNativeCall "get" args
 
 _define :: TPLOperation
 _define env [expr, val] = do name <- extractId env expr
