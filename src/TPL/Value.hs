@@ -20,7 +20,7 @@ data TPLValue = Null
               | Sequence [TPLValue]
               | Lambda [TPLValue] TPLValue
               | Function Env [TPLValue] TPLValue 
-              | ObjLit [(TPLValue, TPLValue)]
+              | ObjLit [(String, TPLValue)]
               | Env Env 
               | Native String deriving (Eq)
                 
@@ -29,7 +29,7 @@ showSeq vals = intercalate " " $ map show vals
 
 instance Show TPLValue where
   show (Null)                   = "null"
-  show (Id name)                = "id: " ++ name
+  show (Id name)                = name
   show (String str)             = str
   show (Number int)             = show int
   show (Operator name)          = name

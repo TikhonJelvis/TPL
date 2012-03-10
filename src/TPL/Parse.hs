@@ -83,9 +83,9 @@ delayedExp = char '$' *> (Lambda [] <$> atom)
 objLit :: Parser TPLValue
 objLit = ObjLit <$> (wLexeme (char '{') *> pair `sepBy` separator <* wLexeme (char '}'))
   where separator = lexeme $ terminator <|> () <$ char ','
-        pair = do name <- wLexeme $ identifier <|> number <|> stringLiteral
-                  val  <- wLexeme (char ':') *> atom
-                  return (name, val)
+        pair = do ident <- wLexeme $ identifier <|> number <|> stringLiteral
+                  val   <- wLexeme (char ':') *> atom
+                  return (show ident, val)
 
 atom :: Parser TPLValue
 atom = lexeme $  lambda
