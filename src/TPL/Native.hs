@@ -1,4 +1,4 @@
-module TPL.Native (eagerNatives, operatorPrecedences, precedenceOf) where
+module TPL.Native (extractId, eagerNatives, operatorPrecedences, precedenceOf) where
 
 import Control.Applicative
 import Control.Arrow ((<<<))
@@ -11,12 +11,22 @@ import TPL.Env
 import TPL.Error
 import TPL.Value
 
+extractId :: Env -> TPLValue -> IOThrowsError String
+extractId env (Id name)                 = do res <- get env name
+                                             case res of
+                                               Id str -> return str
+                                               _      -> extractId env res
+extractId _ (String str)              = return str
+extractId _ (Function _ [] (Id name)) = return name
+extractId env (Function _ [] val)     = extractId env val
+extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
+
 eagerNatives :: [(String, TPLOperation)]
 eagerNatives = [("+", numOp (+)), ("-", numOp (-)), ("*", numOp (*)),
                 ("/", numOp div), ("=", eqOp (==)), ("/=", eqOp (/=)),
                 (">", eqNumOp (>)), ("><", strOp (++)), (":", cons),
                 ("open", open), ("_print", _print), ("substr", substr),
-                ("length", len), ("_if", ifTPL)]
+                ("length", len), ("_if", ifTPL), ("get", _get)]
 
 precedenceOf :: Env -> String -> IOThrowsError Integer
 precedenceOf env op = getPrecedence env op >>= liftThrows . extract
@@ -64,3 +74,8 @@ ifTPL env [condition, consequent, alternate] =
   do cond <- liftThrows $ toBool condition
      ifTPL env [cond, consequent, alternate]
 ifTPL _ expr = throwError $ BadNativeCall "_if" expr
+
+_get :: TPLOperation
+_get _ [Env env, expr] = get env =<< extractId env expr
+_get _ args            = throwError $ BadNativeCall "get" args
+

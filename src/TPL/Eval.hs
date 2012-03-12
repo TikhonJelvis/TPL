@@ -65,7 +65,7 @@ natives :: [(String, TPLOperation)]
 natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("require", require), 
            ("with", with), ("in", _in),
            ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
-           ("define", _define), ("set", _set), ("get", _get)] ++ map eager eagerNatives
+           ("define", _define), ("set", _set)] ++ map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                op env $ left:strict)
         eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= op env)
@@ -95,25 +95,6 @@ defineOp env [Expression ((Id fn):args), body] = define env fn $ Function env ar
 defineOp env [List vals, body]      = do res <- eval env body
                                          definePattern env [List vals, squash res]
 defineOp _ expr = throwError . Default $ "Invalid definition: " ++ show expr
-                                         
-extractId :: Env -> TPLValue -> IOThrowsError String
-extractId env (Id name)                 = do res <- get env name
-                                             case res of
-                                               Id str -> return str
-                                               _      -> extractId env res
-extractId _ (String str)              = return str
-extractId _ (Function _ [] (Id name)) = return name
-extractId env (Function _ [] val)     = extractId env val
-extractId _ val                       = throwError . Default $ "Invalid variable: " ++ show val
-
-_get :: TPLOperation
-_get env [expr]            = do name <- extractId env expr
-                                get env name
-_get env a@[envExpr, expr] = do res <- eval env envExpr
-                                case res of
-                                  Env env' -> _get env' [expr]
-                                  _        -> throwError $ BadNativeCall "get" a
-_get _ args                = throwError $ BadNativeCall "get" args
 
 _define :: TPLOperation
 _define env [expr, val] = do name <- extractId env expr
