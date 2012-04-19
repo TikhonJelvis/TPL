@@ -27,11 +27,11 @@ eval env (Id name) = do res <- get env name
                           Function closure [] body -> eval closure body
                           expr                     -> eval env expr
 eval env val@(Expression _) = normalize env val >>= evalExpr
-  where evalExpr (Expression (fn@(Function{}) : args))     = apply env fn args
-        evalExpr (Expression ((Native name) : args))       = native env name args
-        evalExpr (Expression (fn : rest))                  = do res <- eval env fn
-                                                                evalExpr $ Expression (res : rest)
-        evalExpr value                                     = eval env value
+  where evalExpr (Expression (fn@(Function{}) : args)) = apply env fn args
+        evalExpr (Expression ((Native name) : args))   = native env name args
+        evalExpr (Expression (fn : rest))              = do res <- eval env fn
+                                                            evalExpr $ Expression (res : rest)
+        evalExpr value                                 = eval env value
 eval env (List vals)        = List <$> mapM (eval env) vals
 eval _   (Sequence [])      = return Null
 eval env (Sequence vals)    = last <$> mapM (eval env) vals
@@ -63,25 +63,25 @@ native env name args = case lookup name natives of
   
 natives :: [(String, TPLOperation)]
 natives = [(":=", defineOp), eagerRight ("<-", setOp), eager ("load", load), ("require", require), 
-           ("with", with), ("in", _in),
-           ("precedence", setPrecedenceOp), ("precedenceOf", getPrecedenceOp),
-           ("define", _define), ("set", _set)] ++ map eager eagerNatives
+           ("with", _with), ("in", _in),
+           ("precedence", _precedence), ("precedenceOf", _precedenceOf),
+           ("define", _define), ("set", _set), ("getFrom", _getFrom)] ++ map eager eagerNatives
   where eagerRight (name, op) = (name, \ env (left:rest) -> do strict <- mapM (eval env) rest
                                                                op env $ left:strict)
         eager (name, op)      = (name, \ env args -> mapM (eval env) args >>= op env)
 
 load :: TPLOperation
 load env [arg] = do filename     <- liftThrows $ toString arg >>= extract
-                    path         <- get env "TPL_PATH" >>= liftThrows . (extract <=< toString)
+                    path         <- eval env (Id "TPL_PATH") >>= liftThrows . (extract <=< toString)
                     let filepath = path ++ "/" ++ filename
-                    List current <- get env "_modules"
+                    List current <- eval env $ Id "_modules"
                     set env "_modules" . List $ (String filename) : current
                     run $ filepath ++ ".tpl"
   where run file = liftIO (readFile file) >>= liftThrows . readExpr >>= eval env
 load _ expr    = throwError $ BadNativeCall "load" expr
         
 require :: TPLOperation
-require env [file] = do List current <- get env "_modules"
+require env [file] = do List current <- eval env $ Id "_modules"
                         String name <- liftThrows $ toString file
                         if String name `elem` current
                           then return Null else load env [file]
@@ -106,30 +106,23 @@ _set env [expr, val] = do name <- extractId env expr
                           eval env val >>= set env name
 _set _ args          = throwError $ BadNativeCall "set" args
 
-_in :: TPLOperation
-_in _ [Env env, Function _ args body] = return $ Function env args body
-_in _ [Env env, expr]                 = eval env expr
-_in env [envExpr, expr]               = do newEnv <- eval env envExpr
-                                           _in env [newEnv, expr]
-_in _ args                            = throwError $ BadNativeCall "in" args
+_getFrom curr [Env env, expr] = get env =<< extractId env =<< eval curr expr
+_getFrom env [envExpr, expr]  = do newEnv <- eval env envExpr
+                                   _getFrom env [newEnv, expr]
+_getFrom _ args               = throwError $ BadNativeCall "getFrom" args
 
-with :: TPLOperation
-with env withArgs@[List bindings, Function closure args body] = 
-  do res <- mapM (toBinding . squash) bindings >>= liftIO . bindVars closure
-     apply env (Function res args body) []
-  where toBinding (Expression [Id "->", name, val]) = toBinding $ List [name, val]
-        toBinding (List [nameExp, val]) = do evalled <- eval env val
-                                             name    <- extractId env nameExp
-                                             return (name, evalled)
-        toBinding _ = throwError $ BadNativeCall "with" withArgs
-with env [bindings, Id name] = do val <- get env name
-                                  with env [bindings, val]
-with env [Id name, expr]      = do bindings <- get env name
-                                   with env [bindings, expr]
-with env [Function _ [] b, expr] = with env [b, expr]
-with env [bindings, expr]   = do evaluated <- eval env expr
-                                 with env [bindings, evaluated]
-with _ args                 = throwError $ BadNativeCall "with" args
+_in :: TPLOperation
+_in _ [Env env, expr]   = eval env expr
+_in env [envExpr, expr] = do newEnv <- eval env envExpr
+                             _in env [newEnv, expr]
+_in _ args              = throwError $ BadNativeCall "in" args
+
+_with :: TPLOperation
+_with _ [Env env, Function _ args body] = return $ Function env args body
+_with env [envExpr, funExpr]            = do newEnv <- eval env envExpr
+                                             fun    <- eval env funExpr
+                                             _with env [newEnv, fun]
+_with _ args                            = throwError $ BadNativeCall "with" args
 
 definePattern :: TPLOperation
 definePattern env [List vals, List body] = do mapM_ defPair $ unify vals body
@@ -146,20 +139,20 @@ setOp env [List vals, List body] = do mapM_ setPair $ unify vals body
 setOp env [List vals, body] = setOp env [List vals, List [body]]
 setOp _ expr                = throwError $ BadNativeCall "set" expr
                                           
-setPrecedenceOp :: TPLOperation
-setPrecedenceOp env [opExpr, expr] = go [squash opExpr, expr]
+_precedence :: TPLOperation
+_precedence env [opExpr, expr] = go [squash opExpr, expr]
   where go [Operator op, precedenceExpr] = go [Id op, precedenceExpr]
         go [Id op, precedenceExpr] = 
           do precedence <- eval env precedenceExpr >>= liftThrows . extract
              setPrecedence env op precedence
              return $ Number precedence          
         go badExpr =  throwError $ BadNativeCall "setPrecedence" badExpr
-setPrecedenceOp _ expr = throwError $ BadNativeCall "setPrecedence" expr
+_precedence _ expr = throwError $ BadNativeCall "setPrecedence" expr
      
-getPrecedenceOp :: TPLOperation
-getPrecedenceOp env [Id op] = getPrecedence env op
-getPrecedenceOp env [Sequence [(Id op)]] = getPrecedence env op
-getPrecedenceOp _ expr = throwError $ BadNativeCall "precedenceOf" expr
+_precedenceOf :: TPLOperation
+_precedenceOf env [Id op]              = getPrecedence env op
+_precedenceOf env [Sequence [(Id op)]] = getPrecedence env op
+_precedenceOf _ expr                   = throwError $ BadNativeCall "precedenceOf" expr
  
 baseEnv :: IO Env
 baseEnv = nullEnv >>= (`bindVars` map (\(name, _) -> (name, Native name)) natives)

@@ -62,7 +62,6 @@ substr _ expr = throwError $ BadNativeCall "substr" expr
 len :: TPLOperation
 len _ [String str] = return . Number $ genericLength str
 len _ [List ls]    = return . Number $ genericLength ls
-
 len env [expr]     = do str <- liftThrows $ toString expr
                         len env [str]
 len _ expr         = throwError $ BadNativeCall "len" expr
@@ -76,6 +75,5 @@ ifTPL env [condition, consequent, alternate] =
 ifTPL _ expr = throwError $ BadNativeCall "_if" expr
 
 _get :: TPLOperation
-_get _ [Env env, expr] = get env =<< extractId env expr
-_get _ args            = throwError $ BadNativeCall "get" args
-
+_get env [expr] = get env =<< extractId env expr
+_get _ args     = throwError $ BadNativeCall "get" args

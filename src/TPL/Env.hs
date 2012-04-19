@@ -23,10 +23,14 @@ getLocal ref name = M.lookup name <$> liftIO (readIORef ref) >>= maybe (und name
 setLocal :: Env -> String -> TPLValue -> IOThrowsError TPLValue
 setLocal ref name val = do maybeVal <- M.lookup name <$> liftIO (readIORef ref)
                            if isJust maybeVal then update ref name val else und name
+                           
+getRemote :: Env -> String -> IOThrowsError TPLValue
+getRemote env name = do getFun <- getLocal env "get"
+                        return $ Expression [getFun, String name]
 
 get :: Env -> String -> IOThrowsError TPLValue
 get ref "*current*" = return $ Env ref
-get ref name = getLocal ref name <|> (getLocal ref "*parent*" >>= liftThrows . extract >>= (`get` name)) <|> und name
+get ref name        = getLocal ref name <|> getRemote ref name <|> und name
 
 set :: Env -> String -> TPLValue -> IOThrowsError TPLValue
 set _ "*current*" _ = throwError $ Default "Cannot change the current environment"
@@ -37,8 +41,8 @@ define :: Env -> String -> TPLValue -> IOThrowsError TPLValue
 define ref name val = setLocal ref name val <|> update ref name val
 
 bindVars :: Env -> [(String, TPLValue)] -> IO Env
-bindVars ref bindings = let parent = pack ref
-                            newEnv = M.insert "*parent*" parent $ M.fromList bindings in
+bindVars ref bindings = let getFun = Function ref [Id "name"] $ Expression [Native "getFrom", Env ref, Id "name"]
+                            newEnv = M.insert "get" getFun $ M.fromList bindings in
                         newIORef newEnv
 
 defaultPrecedence :: TPLValue
