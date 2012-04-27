@@ -6,7 +6,9 @@ TPL is heavily influenced by JavaScript, Haskell and Scheme; I also took ideas f
 
 ## Documentation
 
-Read all about the language in the [Guide](https://github.com/TikhonJelvis/TPL/blob/master/Guide.md)
+Read all about the language in the [Guide](http://inst.eecs.berkeley.edu/~tikhon/tpl)
+
+This is also availabile as a Markdown page on [Github](https://github.com/TikhonJelvis/TPL/blob/master/Guide.md).
 
 ## Installation Instructions
 
