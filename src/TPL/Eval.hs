@@ -178,4 +178,4 @@ evalString :: Env -> String -> IO String
 evalString env expr = runIOThrows $ do res <- squash <$> liftThrows (readExpr expr) >>= eval env
                                        case res of
                                          Env _ -> return "<env>"
-                                         _     -> return $ show res
+                                         _     -> return $ display res
