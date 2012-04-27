@@ -77,7 +77,7 @@ Functions can be partially applied. That is, given:
 
     f a b := a + b
 
-the expression `f 1` is equal to `\ x -> f 1 x`.
+the expression `f 1` is equal to `\ α -> f 1 α`.
 
 You can define a function that has a body containing multiple statements. This is done by surrounding the body in parentheses. Just like in the body of the program, you can separate statements by semi-colons or newlines.
 
@@ -265,8 +265,8 @@ There are also a bunch of fairly standard but useful functions for list manipula
 
 ## Objects
 
-The one feature that I want but that is missing currently are objects. Particularly, I want to have objects that behave roughly like JavaScript objects, except somewhat more general. Particularly, I want the programmer to be able to override how missing properties are looked up or even change how *all* properties are looked up or set. 
+The one main feature still missing from the interpreter is support for objects.
 
-Additionally, I want to unify objects and scopes, giving the programmer full control of the scope.
+I want to add objects that behave much like objects in JavaScript or Lua. I want them to be as simple and as flexible as possible; particularly, I will not add classes to the language and I will let programmers have full control of how values are set and looked up in objects (much like proxies do in JavaScript).
 
-However, that part of the interpreter does not work yet, so I have moved all that development to the "objects" branch. When I have more time (ideally over the summer), I will finish implementing objects.
+However, I actually want to go one step further than JavaScript or Lua: I want to unify the idea of scopes (environments) and objects. I want to be able to treat a function's environment as an object and to set an arbitrary object as a function's environment. This will give the programmer full control over how variables behave inside a function, making the `with` function for custom scoping redundant. You will be able to do anything you want (including introducing arbitrary variables) with a function, so you would be able to implement `with` in terms of objects and environments rather than needing it to be provided by the interpreter.
