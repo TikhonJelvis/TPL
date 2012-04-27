@@ -92,7 +92,7 @@ You can actually put "blocks" of code like this anywhere you could put a normal 
 
 How you indent code like this is, naturally, completely up to you.
 
-## Laziness
+### Laziness
 
 If you declare a function taking *no* arguments, it isn't immediately clear how to use it. Other functions get called when you pass parameters into them (`f 1 2 3`), but how do you call one without any parameters?
 
@@ -112,9 +112,9 @@ will *never* evaluate `b`. If you call `f a (print "blarg")` nothing will be pri
 
 This also works on patterns (like `f $[a, b]`).
 
-## Custom Scope
+### Custom Scope
 
-You can add bindings to the environment of a closure using the `with` native function. Given a closer `f`, we can write:
+You can add bindings to the environment of a closure using the `with` native function. Given a closure `f`, we can write:
 
     g := with ["x" -> 11] f
 
