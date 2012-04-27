@@ -16,6 +16,8 @@ To install, clone this repository and use `cabal`:
     cd TPL
     cabal install
 
+If you use Emacs, you can also install a simple Emacs mode for TPL. To do this, copy `emacs/tpl-mode.el` to somewhere in your load path and add `(require 'tpl-mode)` to your `.emacs` file. This will automatically associate `.tpl` files with `tpl-mode`.
+
 ## Future Features:
 
 In the near future, I want to add:
