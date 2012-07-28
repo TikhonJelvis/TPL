@@ -24,12 +24,10 @@ keyword :: String -> Parser String
 keyword str = try (string str) <* notFollowedBy idChar <* whitespace
 
 stringLiteral :: Parser Term
-stringLiteral = do opener <- oneOf "\"'"
-                   contents <- many $ (char '\\' *> specChar) <|> noneOf [opener]
-                   char opener <?> "end of string"
-                   return $ StringLiteral contents
-                   
-  where specChar = spec <$> escapeCharacter
+stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace
+  where strLit quote = char quote *> contents quote <* char quote
+        contents quote = many $ (char '\\' *> specChar) <|> noneOf [quote] 
+        specChar = spec <$> escapeCharacter
         escapeCharacter = oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, or ')"
         spec character = case character of
           'n' -> '\n'
