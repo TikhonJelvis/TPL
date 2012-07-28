@@ -1,82 +1,0 @@
-
-src/TPL/Coerce.hs,316
-type TTPLOperationTPLOperation16,381
-class Extractable a where eextractextract18,444
-class Packable a where ppackpack19,506
-lliftOpliftOp45,1556
-nnumOpnumOp48,1736
-eeqOpeqOp49,1803
-eeqNumOpeqNumOp50,1865
-sstrOpstrOp51,1929
-ttoNumbertoNumber54,2037
-ttoStringtoString62,2420
-ttoBooltoBool65,2495
-
-src/TPL/Env.hs,157
-ggetget28,894
-ssetset32,1107
-ddefinedefine37,1418
-bbindVarsbindVars40,1534
-ggetPrecedencegetPrecedence48,1820
-ssetPrecedencesetPrecedence51,1969
-
-src/TPL/Error.hs,505
-data TTPLErrorTPLError11,213
-data TPLError = PParserParser11,213
-              | BBadOpBadOp12,246
-              | MMissingOperandMissingOperand13,274
-              | TTypeMismatchTypeMismatch14,311
-              | UUndefinedVariableUndefinedVariable15,353
-              | BBadNativeCallBadNativeCall16,393
-              | DDefaultDefault17,440
-type TThrowsErrorThrowsError34,1149
-type IIOThrowsErrorIOThrowsError35,1183
-lliftThrowsliftThrows45,1499
-rrunIOThrowsrunIOThrows49,1621
-
-src/TPL/Eval.hs,76
-eevaleval21,438
-bbaseEnvbaseEnv174,8663
-eevalStringevalString178,8843
-
-src/TPL/Main.hs,40
-wwelcomewelcome7,56
-mmainmain10,119
-
-src/TPL/Native.hs,116
-eeagerNativeseagerNatives15,272
-pprecedenceOfprecedenceOf22,652
-ooperatorPrecedencesoperatorPrecedences25,751
-
-src/TPL/Parse.hs,80
-ooperatorCharactersoperatorCharacters54,1606
-eexpressionsexpressions96,2900
-
-src/TPL/Pattern.hs,42
-uunifyunify6,113
-ssquashsquash26,1286
-
-src/TPL/Run.hs,42
-rreplrepl24,555
-rrunFilerunFile31,840
-
-src/TPL/Syntax.hs,28
-nnormalizenormalize15,244
-
-src/TPL/Value.hs,569
-type EEnvEnv7,114
-nnullEnvnullEnv10,171
-data TTPLValueTPLValue12,199
-data TPLValue = NNullNull12,199
-              | IIdId13,219
-              | NNumberNumber14,244
-              | SStringString15,274
-              | BBooleanBoolean16,303
-              | OOperatorOperator17,331
-              | LListList18,362
-              | EExpressionExpression19,393
-              | SSequenceSequence20,430
-              | LLambdaLambda21,465
-              | FFunctionFunction22,507
-              | EEnvEnv23,556
-              | NNativeNative24,580

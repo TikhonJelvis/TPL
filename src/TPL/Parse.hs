@@ -1,104 +1,93 @@
-module TPL.Parse (TPLValue (..), expressions, parse, operatorCharacters) where
+module TPL.Parse where
 
-import Control.Applicative ((<$>), (<$), (<*), (*>), liftA2)
+import Control.Applicative           ((<$>), (<$), (<*), (*>), (<*>))
 import Text.ParserCombinators.Parsec
+
 import TPL.Value
                                              
-whiteSpace :: CharParser st ()
-whiteSpace = skipMany $ oneOf " \t"
+comment :: Parser ()
+comment = () <$ (string "--" *> many (noneOf "\n"))
 
-terminator :: CharParser st ()
-terminator = () <$ oneOf ";\n" <|> eof
+whitespace :: Parser ()
+whitespace = skipMany (() <$ oneOf " \t" <|> comment)
 
-lexeme :: CharParser st a -> CharParser st a
-lexeme = (<* whiteSpace)
-              
-wLexeme :: CharParser st a -> CharParser st a
-wLexeme = (<* spaces)
+allSpaces :: Parser ()
+allSpaces = skipMany (whitespace <|> () <$ space)
 
 idChar :: Parser Char
 idChar = letter <|> digit <|> oneOf "_"
 
-keyWord :: String -> Parser String
-keyWord str = lexeme $ try (string str) <* notFollowedBy idChar
+idStartChar :: Parser Char
+idStartChar = letter <|> digit
+          
+keyword :: String -> Parser String
+keyword str = try (string str) <* notFollowedBy idChar <* whitespace
 
-specChar :: CharParser st Char
-specChar = spec <$> (oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, or ')")
-  where spec character = case character of
-          'n'  -> '\n'
-          't'  -> '\t'
-          c    ->  c -- All other characters are just themselves when escaped.
-    
-stringLiteral :: Parser TPLValue
-stringLiteral = do opener   <- oneOf "\"'"
+stringLiteral :: Parser Term
+stringLiteral = do opener <- oneOf "\"'"
                    contents <- many $ (char '\\' *> specChar) <|> noneOf [opener]
                    char opener <?> "end of string"
-                   return $ String contents
+                   return $ StringLiteral contents
+                   
+  where specChar = spec <$> escapeCharacter
+        escapeCharacter = oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, or ')"
+        spec character = case character of
+          'n' -> '\n'
+          't' -> '\t'
+          c   -> c
 
-bool :: Parser TPLValue
-bool = Boolean . (== "true") <$> (keyWord "true" <|> keyWord "false")
+bool :: Parser Term
+bool = BoolLiteral . (== "true") <$> (keyword "true" <|> keyword "false") <?> "boolean"
 
-number :: Parser TPLValue
-number = Number . read <$> many1 digit <?> "number"
+num :: Parser Term
+num = NumericLiteral . read <$> many1 digit <?> "number"
 
-nullExp :: Parser TPLValue
-nullExp = Null <$ keyWord "null"
-               
+nullExp :: Parser Term
+nullExp = NullLiteral <$ keyword "null"
+
 name :: Parser String
-name = liftA2 (:) (letter <|> char '_') (many idChar)
+name = (:) <$> idStartChar <*> many idChar
 
-identifier :: Parser TPLValue
-identifier = Id <$> name
+identifier :: Parser Term
+identifier = Id <$> name <?> "identifier"
 
-operatorCharacters :: [Char]
-operatorCharacters = "+-=*&^%#@!?/.|~<>:"
+operator :: Parser Term
+operator = Operator <$> (op <|> char '`' *> name <* char '`')
+  where opChars = "+-=*&^%#@!?/.|~<>:"
+        op = many1 $ oneOf opChars
+        
+list :: Parser Term
+list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> allSpaces) contents
+  where contents = expression `sepBy` char ',' <* allSpaces
 
-operator :: Parser TPLValue
-operator = Operator <$> (many1 (oneOf operatorCharacters) <|> char '`' *> name <* char '`')
+lambda :: Parser Term
+lambda = oneOf "\\λ" *> (Lambda <$> parameters <*> body)
+  where parameters = allSpaces *> many argument
+        argument = identifier <|> list <|> delayedExp
+        body = string "->" *> allSpaces *> expression
+        
+delayedExp :: Parser Term
+delayedExp = char '$' *> allSpaces *> (Lambda [] <$> atom) 
 
-list :: Parser TPLValue
-list = List <$> between (wLexeme $ char '[') (char ']') (wLexeme expression `sepBy` wLexeme (char ','))
+block :: Parser Term
+block = between (char '(' *> allSpaces) (char ')' *> allSpaces) expressions
 
-lambda :: Parser TPLValue
-lambda = do oneOf "\\λ"
-            parameters <- parameterList
-            lexeme $ string "->"
-            body       <- expression
-            return $ Lambda parameters body
-  where parameterList = whiteSpace *> many (lexeme argument)
-        argument      = identifier <|> list <|> delayedExp
+expression :: Parser Term
+expression = ExpressionLiteral <$> many1 atom <?> "expression" 
 
-expression :: Parser TPLValue
-expression = Expression <$> many1 atom <?> "expression"
-
-terminatedExpression :: Parser TPLValue
-terminatedExpression = expression <* (wLexeme terminator <|> lookAhead (() <$ char ')'))
-
-block :: Parser TPLValue
-block = Sequence <$> between (wLexeme $ char '(') (char ')') (many terminatedExpression)
-
-delayedExp :: Parser TPLValue
-delayedExp = char '$' *> (Lambda [] <$> atom)
-
-objLit :: Parser TPLValue
-objLit = ObjLit <$> (wLexeme (char '{') *> pair `sepBy` separator <* wLexeme (char '}'))
-  where separator = lexeme $ terminator <|> () <$ char ','
-        pair = do ident <- wLexeme $ identifier <|> number <|> stringLiteral
-                  val   <- wLexeme (char ':') *> atom
-                  return (show ident, val)
-
-atom :: Parser TPLValue
-atom = lexeme $  lambda
-             <|> objLit
-             <|> bool
-             <|> nullExp
-             <|> identifier
-             <|> stringLiteral
-             <|> number
-             <|> operator
-             <|> list
-             <|> block
-             <|> delayedExp
-
-expressions :: Parser TPLValue
-expressions = Sequence <$> many terminatedExpression
+atom :: Parser Term
+atom =  lambda
+    <|> bool
+    <|> nullExp
+    <|> identifier
+    <|> stringLiteral
+    <|> num
+    <|> operator
+    <|> list
+    <|> delayedExp
+    <|> block
+    
+expressions :: Parser Term
+expressions = Block <$> many (expression <* end)
+  where terminator = () <$ oneOf ";\n" <|> eof
+        end = (terminator *> allSpaces) <|> lookAhead (() <$ char ')')
