@@ -21,7 +21,7 @@ idStartChar :: Parser Char
 idStartChar = letter <|> char '_'
           
 keyword :: String -> Parser String
-keyword str = try (string str) <* notFollowedBy idChar <* whitespace
+keyword str = try (string str) <* notFollowedBy idChar <* whitespace <?> str
 
 stringLiteral :: Parser Term
 stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace <?> "string"
@@ -35,10 +35,10 @@ stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace <?>
           c   -> c
 
 bool :: Parser Term
-bool = BoolLiteral . (== "true") <$> (keyword "true" <|> keyword "false") <?> "boolean"
+bool = BoolLiteral . (== "true") <$> (keyword "true" <|> keyword "false") <* whitespace <?> "boolean"
 
 num :: Parser Term
-num = NumericLiteral . read <$> many1 digit <?> "number"
+num = NumericLiteral . read <$> many1 digit <* whitespace <?> "number"
 
 nullExp :: Parser Term
 nullExp = NullLiteral <$ keyword "null"
@@ -47,15 +47,15 @@ name :: Parser String
 name = (:) <$> idStartChar <*> many idChar
 
 identifier :: Parser Term
-identifier = Id <$> name <?> "identifier"
+identifier = Id <$> name <* whitespace <?> "identifier"
 
 operator :: Parser Term
-operator = Operator <$> (op <|> char '`' *> name <* char '`')
-  where opChars = "+-=*&^%#@!?/.|~<>:"
+operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
+  where opChars = "+-=*&^%#@!?/.|~<>:" -- TODO: Systematically identify valid opChars...
         op = many1 $ oneOf opChars
         
 list :: Parser Term
-list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> allSpaces) contents
+list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
   where contents = expression `sepBy` char ',' <* allSpaces
 
 lambda :: Parser Term
