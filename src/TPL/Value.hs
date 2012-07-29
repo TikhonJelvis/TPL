@@ -10,6 +10,6 @@ data Term = NullLiteral
           | Lambda [Term] Term
           | ExpressionLiteral [Term]
           | Block [Term]
-          | ObjectLiteral [(Term, Term)] deriving (Eq)
+          | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 
 type AST = [Term]

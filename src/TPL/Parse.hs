@@ -12,19 +12,19 @@ whitespace :: Parser ()
 whitespace = skipMany (() <$ oneOf " \t" <|> comment)
 
 allSpaces :: Parser ()
-allSpaces = skipMany (whitespace <|> () <$ space)
+allSpaces = skipMany (() <$ oneOf " \t" <|> comment <|> () <$ space)
 
 idChar :: Parser Char
-idChar = letter <|> digit <|> oneOf "_"
+idChar = letter <|> digit <|> char '_'
 
 idStartChar :: Parser Char
-idStartChar = letter <|> digit
+idStartChar = letter <|> char '_'
           
 keyword :: String -> Parser String
 keyword str = try (string str) <* notFollowedBy idChar <* whitespace
 
 stringLiteral :: Parser Term
-stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace
+stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace <?> "string"
   where strLit quote = char quote *> contents quote <* char quote
         contents quote = many $ (char '\\' *> specChar) <|> noneOf [quote] 
         specChar = spec <$> escapeCharacter
@@ -86,6 +86,6 @@ atom =  lambda
     <|> block
     
 expressions :: Parser Term
-expressions = Block <$> many (expression <* end)
+expressions = allSpaces *> (Block <$> many (expression <* end))
   where terminator = () <$ oneOf ";\n" <|> eof
         end = (terminator *> allSpaces) <|> lookAhead (() <$ char ')')
