@@ -13,7 +13,7 @@ defaultPrecedence = 10
 possiblePrecedences :: [Int]
 possiblePrecedences = [1..11]
 
-normalize :: [(Term, Int)] -> Term -> Term
+normalize :: [(Term, Int)] -> Term -> Term -- Take care of operator precedence and sections
 normalize precs = handleInfix . desugar
   where handleInfix (Expression expr) = Expression $ foldl1 (.) handleAll expr'
           where expr' = Expression <$> groupBy ((==) `on` isOp) expr

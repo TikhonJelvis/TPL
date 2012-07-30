@@ -23,4 +23,4 @@ data Value = Null
            | Function Env [Term] Term
            | Object Env deriving (Show, Eq)
              
-type Env = [(String, Value)]
+type Env = [(String, Value)]    -- Potentially make this faster in the future.
