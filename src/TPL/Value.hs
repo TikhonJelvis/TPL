@@ -8,7 +8,7 @@ data Term = NullLiteral
           | Operator String
           | ListLiteral [Term]
           | Lambda [Term] Term
-          | ExpressionLiteral [Term]
+          | Expression [Term]
           | Block [Term]
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 

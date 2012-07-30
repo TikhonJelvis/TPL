@@ -71,7 +71,7 @@ block :: Parser Term
 block = between (char '(' *> allSpaces) (char ')' *> allSpaces) expressions
 
 expression :: Parser Term
-expression = ExpressionLiteral <$> many1 atom <?> "expression" 
+expression = Expression <$> many1 atom <?> "expression" 
 
 atom :: Parser Term
 atom =  lambda
