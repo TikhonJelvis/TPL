@@ -12,6 +12,7 @@ data Term = NullLiteral
           | Lambda [Term] Term
           | Expression [Term]
           | Block [Term]
+          | Rest Term
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 
 data Value = Null
