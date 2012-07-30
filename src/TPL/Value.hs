@@ -1,8 +1,10 @@
 module TPL.Value where
 
+type Number = Integer
+
 data Term = NullLiteral
           | Id String
-          | NumericLiteral Integer
+          | NumericLiteral Number
           | StringLiteral String
           | BoolLiteral Bool
           | Operator String
@@ -12,4 +14,13 @@ data Term = NullLiteral
           | Block [Term]
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 
-type AST = [Term]
+data Value = Null
+           | Var String
+           | Number Number
+           | String String
+           | Bool Bool
+           | List [Value]
+           | Function Env [Term] Term
+           | Object Env deriving (Show, Eq)
+             
+type Env = [(String, Value)]
