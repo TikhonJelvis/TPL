@@ -1,5 +1,8 @@
 module TPL.Value where
 
+import Data.IORef
+import qualified Data.Map as M
+
 type Number = Integer
 
 data Term = NullLiteral
@@ -12,7 +15,6 @@ data Term = NullLiteral
           | Lambda [Term] Term
           | Expression [Term]
           | Block [Term]
-          | Rest Term
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 
 data Value = Null
@@ -21,7 +23,12 @@ data Value = Null
            | String String
            | Bool Bool
            | List [Value]
-           | Function Env [Term] Term
-           | Object Env deriving (Show, Eq)
+           | Function EnvRef [Term] Term
+           | Object EnvRef deriving (Show, Eq)
              
-type Env = [(String, Value)]    -- Potentially make this faster in the future.
+-- Potentially make this faster in the future.
+type Env = M.Map String Value
+                                    
+newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
+
+instance Show EnvRef where show _ = "<env>"
