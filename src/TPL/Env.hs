@@ -9,7 +9,7 @@ import TPL.Error
 import TPL.Value
 
 und :: String -> Either Error a
-und = Left . UndefinedVariable
+und = Left . Error [] . UndefinedVariable
 
 getEnv :: String -> Env -> Result
 getEnv name env = maybe (und name) Right $ M.lookup name env
@@ -32,3 +32,6 @@ setEnvRef name val (EnvRef ref) = do env <- readIORef ref
                                        
 defineEnvRef :: String -> Value -> EnvRef  -> IO Value
 defineEnvRef name val (EnvRef ref) = val <$ (modifyIORef ref $ defineEnv name val)
+
+getPrecs :: IO [(Term, Int)]
+getPrecs = return []            -- TODO: Make this work!
