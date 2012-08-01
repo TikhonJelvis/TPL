@@ -1,34 +1,37 @@
 module TPL.Env where
 
-import Data.Functor ((<$>), (<$))
-import Data.IORef   (readIORef, writeIORef, modifyIORef)
+import Control.Monad.Error (throwError, liftIO)
+
+import Data.Functor        ((<$>), (<$))
+import Data.IORef          (readIORef, writeIORef, modifyIORef)
 import qualified Data.Map as M
-import Data.Maybe   (fromMaybe)
+import Data.Maybe          (fromMaybe)
 
 import TPL.Error
 import TPL.Value
 
-und :: String -> Either Error a
-und = Left . Error [] . UndefinedVariable
+und :: String -> Error
+und = Error [] . UndefinedVariable
 
-getEnv :: String -> Env -> Result
-getEnv name env = maybe (und name) Right $ M.lookup name env
+getEnv :: String -> Env -> Either Error Value
+getEnv name env = maybe (Left $ und name) Right $ M.lookup name env
 
 setEnv :: String -> Value -> Env -> Either Error Env
-setEnv name val env = maybe (und name) (const newEnv) $ M.lookup name env
+setEnv name val env = maybe (Left $ und name) (const newEnv) $ M.lookup name env
   where newEnv = Right $ M.insert name val env
         
 defineEnv :: String -> Value -> Env -> Env 
 defineEnv name val env = M.insert name val env
         
-getEnvRef :: String -> EnvRef -> IO Result
-getEnvRef name (EnvRef ref) = getEnv name <$> readIORef ref
+getEnvRef :: String -> EnvRef -> Result Value
+getEnvRef name (EnvRef ref) = do env <- liftIO $ readIORef ref
+                                 liftEither $ getEnv name env
 
-setEnvRef :: String -> Value -> EnvRef -> IO Result
-setEnvRef name val (EnvRef ref) = do env <- readIORef ref
+setEnvRef :: String -> Value -> EnvRef -> Result Value
+setEnvRef name val (EnvRef ref) = do env <- liftIO $ readIORef ref
                                      case setEnv name val env of
-                                       Left err -> return $ Left err
-                                       Right env' -> Right val <$ writeIORef ref env'
+                                       Left err -> throwError err
+                                       Right env' -> val <$ liftIO (writeIORef ref env')
                                        
 defineEnvRef :: String -> Value -> EnvRef  -> IO Value
 defineEnvRef name val (EnvRef ref) = val <$ (modifyIORef ref $ defineEnv name val)

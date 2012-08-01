@@ -18,7 +18,6 @@ data Term = NullLiteral
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
 
 data Value = Null
-           | Var String
            | Number Number
            | String String
            | Bool Bool
@@ -32,3 +31,12 @@ type Env = M.Map String Value
 newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
 
 instance Show EnvRef where show _ = "<env>"
+                           
+showType :: Value -> String
+showType Null       = "null"
+showType Number{}   = "number"
+showType String{}   = "string"
+showType Bool{}     = "bool"
+showType List{}     = "list"
+showType Function{} = "function"
+showType Object{}   = "object"

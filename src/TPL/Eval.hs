@@ -1,11 +1,13 @@
 module TPL.Eval where
 
-import Data.Functor ((<$>))
+import Control.Monad.Error           (throwError, liftIO, runErrorT)
+
+import Data.Functor                  ((<$>))
 
 import Text.ParserCombinators.Parsec (parse)
 
 import TPL.Env                       (getEnvRef, getPrecs)
-import TPL.Error                     (Result, ErrorType(..), Error(..), pushTrace)
+import TPL.Error                     (Result, ErrorType(..), Error(..), pushTrace, throw)
 import TPL.Parse                     (expressions)
 import TPL.Syntax                    (normalize)
 import TPL.Value
@@ -15,17 +17,16 @@ readExpr expr = case parse expressions "TPL" expr of
   Left err  -> Left . Error [] $ Parser err
   Right val -> Right val
 
-eval :: EnvRef -> Term -> IO Result
-eval env expr = do res <- go expr
-                   return $ case res of
-                     Left err -> Left $ pushTrace err expr 
-                     res      -> res
+eval :: EnvRef -> Term -> Result Value
+eval env expr = do res <- liftIO . runErrorT $ go expr
+                   case res of
+                     Left err  -> throwError $ pushTrace err expr 
+                     Right res -> return res
   where go (Id name) = do res <- getEnvRef name env
                           case res of
-                            Right (Function closure [] body) -> eval closure body
-                            val@Right{}                      -> return val
-                            err@Left{}                       -> return err
-        go e@Expression{} = (`normalize` e) <$> getPrecs >>= evalExpr env
-          where evalExpr (Expression (fn@Function{} : args)) = apply fn args
-                
-        apply = undefined
+                            Function closure [] body -> eval closure body
+                            val                      -> return val
+        go e@Expression{} = (`normalize` e) <$> liftIO getPrecs >>= evalExpr
+          where evalExpr (Expression (λ : args)) = eval env λ >>= (`apply` args)
+                apply fn args = throw $ TypeMismatch "function" fn
+        

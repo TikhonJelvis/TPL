@@ -2,7 +2,7 @@ module TPL.Pattern where
 
 import TPL.Value
 
-unify :: [Term] -> [Value] -> Env
+unify :: [Term] -> [Value] -> [(String, Value)]
 unify pats vals = zip pats (vals ++ repeat Null) >>= unifyPat
   where unifyPat (Id name, val) = [(name, val)]
         unifyPat (ListLiteral ls, List vs) = case last ls of
