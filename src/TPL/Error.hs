@@ -21,8 +21,9 @@ data ErrorType = Parser ParseError
                | BadOp String
                | MissingOperand String
                | TypeMismatch String Value
-               | UndefinedVariable String
+               | UndefinedVariable Term
                | BadNativeCall String [Term]
+               | TooManyArguments Value
                | Default String deriving (Show)
 
 showError :: ErrorType -> String
@@ -31,8 +32,9 @@ showError (BadOp op) = "Unknown operator " ++ op
 showError (Default str) = str
 showError (TypeMismatch expected got) = "Wrong type. Expected " ++ expected ++ "; got " ++ showType got ++ "."
 showError (MissingOperand op) = "Missing operand for " ++ op
-showError (UndefinedVariable var) = "Variable " ++ var ++ "is not defined."
+showError (UndefinedVariable var) = "Variable " ++ show var ++ "is not defined."
 showError (BadNativeCall name expr) = "Invalid native call to " ++ name ++ ": " ++ show expr ++ "." 
+showError (TooManyArguments fn) = "Too many arguments passed to " ++ show fn
 
 showErrorStack :: Error -> String
 showErrorStack (Error stack err) = showError err ++ "\nStack Trace:\n" ++ intercalate "\n" (show <$> stack)

@@ -15,7 +15,7 @@ data Term = NullLiteral
           | Lambda [Term] Term
           | Expression [Term]
           | Block [Term]
-          | ObjectLiteral [(Term, Term)] deriving (Show, Eq)
+          | ObjectLiteral [(Term, Term)] deriving (Show, Eq, Ord)
 
 data Value = Null
            | Number Number
@@ -26,7 +26,7 @@ data Value = Null
            | Object EnvRef deriving (Show, Eq)
              
 -- Potentially make this faster in the future.
-type Env = M.Map String Value
+type Env = M.Map Term Value
                                     
 newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
 
