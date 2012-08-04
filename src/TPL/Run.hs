@@ -11,8 +11,7 @@ readPrompt :: String -> IO String
 readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
 
 evalAndPrint :: EnvRef -> String -> IO ()
-evalAndPrint env expr = do putStrLn "going!"
-                           evalString env expr >>= putStrLn
+evalAndPrint env expr = evalString env expr >>= putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
 until_ predicate prompt action = 

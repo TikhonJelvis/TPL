@@ -40,7 +40,10 @@ eval env expr = do res <- liftIO . runErrorT $ go expr
                                       Function closure [] body -> eval closure body
                                       val                      -> return val
         go e@Expression{}      = (`normalize` e) <$> liftIO getPrecs >>= evalExpr
-          where evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM apply fn args
+          where evalExpr (Expression [])         = return Null
+                evalExpr (Expression [term])     = eval env term
+                evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM apply fn args
+                evalExpr expr                    = eval env expr
 
                 apply fn@(Function _ [] _) _ = Err.throw $ Err.TooManyArguments fn
                 apply fn@(Function cl [p] body) arg = getArgEnv p arg cl >>= (`eval` body)

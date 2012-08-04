@@ -11,7 +11,7 @@ import TPL.Value
 
 type Result a = E.ErrorT Error IO a
 
-data Error = Error [Term] ErrorType
+data Error = Error [Term] ErrorType deriving (Show)
 
 instance E.Error Error where
   noMsg  = Error [] $ Default "Oh no, something went wrong!"

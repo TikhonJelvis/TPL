@@ -5,6 +5,8 @@ import Data.Functor  ((<$>))
 import Data.List     (groupBy)
 import Data.Maybe    (fromMaybe)
 
+import Debug.Trace   (trace)
+
 import TPL.Value
 
 defaultPrecedence :: Int
@@ -13,10 +15,10 @@ defaultPrecedence = 10
 possiblePrecedences :: [Int]
 possiblePrecedences = [1..11]
 
-normalize :: [(Term, Int)] -> Term -> Term -- Take care of operator precedence and sections
-normalize precs = handleInfix . desugar
-  where handleInfix (Expression expr) = Expression $ foldl1 (.) handleAll expr'
-          where expr' = Expression <$> groupBy ((==) `on` isOp) expr
+normalize :: [(String, Int)] -> Term -> Term -- Take care of operator precedence and sections
+normalize precs = desugar . handleInfix
+  where handleInfix (Expression expr) = squash . Expression $ foldl1 (.) handleAll expr'
+          where expr' = squash . Expression <$> groupBy ((==) `on` isOp) expr
                 handleAll = handle <$> possiblePrecedences
                 handle prec (left : op@Operator{} : right : more) = handleOp (getPrec op)
                   where handleOp actualPrec
@@ -26,13 +28,15 @@ normalize precs = handleInfix . desugar
                 handle _ val            = val
         handleInfix val = val
         
-        getPrec str = fromMaybe defaultPrecedence (lookup str precs)
+        getPrec (Operator str) = fromMaybe defaultPrecedence $ lookup str precs
+        getPrec _              = defaultPrecedence
 
         desugar (Expression [op@Operator{}, right]) = section [sId, op, right]
         desugar (Expression [left, op@Operator{}])  = section [left, op, sId]
-        desugar (Expression [a, Operator op, b])  = desugar $ Expression [Id op, a, b]
+        desugar (Expression [a, Operator op, b])    = desugar $ Expression [Id op, a, b]
         desugar (Expression expr)                   = Expression $ normalize precs <$>  expr
-        desugar (ListLiteral items)                 = Expression $ normalize precs <$> items
+        desugar (ListLiteral items)                 = ListLiteral $ normalize precs <$> items
+        desugar (Block terms)                       = Block $ normalize precs <$> terms
         desugar (Operator op)                       = Id op
         desugar val                                 = val
 
@@ -45,3 +49,8 @@ section = Lambda [sId] . Expression
 isOp :: Term -> Bool
 isOp Operator{} = True
 isOp _          = False
+
+squash :: Term -> Term
+squash (Expression [term]) = term
+squash (Block [term])      = term
+squash term                = term
