@@ -1,5 +1,14 @@
 module Main where
 
-version = "0.0.2"
+import System.Environment
 
-main = putStrLn $ "Welcome to TPL version " ++ version
+import TPL.Run
+
+version = "0.2.0"
+
+welcome = "Welcome to TPL version " ++ version ++ "\n Type \"quit\" to quit."
+
+main = do args <- getArgs
+          case args of
+            [] -> putStrLn welcome >> repl
+            ls -> mapM_ runFile ls

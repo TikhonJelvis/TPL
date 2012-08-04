@@ -21,7 +21,7 @@ data ErrorType = Parser ParseError
                | BadOp String
                | MissingOperand String
                | TypeMismatch String Value
-               | UndefinedVariable Term
+               | UndefinedVariable Value
                | BadNativeCall String [Term]
                | TooManyArguments Value
                | Default String deriving (Show)

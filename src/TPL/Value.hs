@@ -1,5 +1,6 @@
 module TPL.Value where
 
+import Data.Functor            ((<$>))
 import Data.IORef
 import qualified Data.Map as M
 
@@ -20,17 +21,22 @@ data Term = NullLiteral
 data Value = Null
            | Number Number
            | String String
+           | Symbol String
            | Bool Bool
            | List [Value]
            | Function EnvRef [Term] Term
-           | Object EnvRef deriving (Show, Eq)
+           | Object EnvRef deriving (Show, Eq, Ord)
              
 -- Potentially make this faster in the future.
-type Env = M.Map Term Value
+type Env = M.Map Value Value
                                     
 newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
 
 instance Show EnvRef where show _ = "<env>"
+instance Ord EnvRef where compare _ _ = EQ
+                          
+nullEnv :: IO EnvRef
+nullEnv = EnvRef <$> newIORef M.empty
                            
 showType :: Value -> String
 showType Null       = "null"
