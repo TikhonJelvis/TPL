@@ -13,7 +13,7 @@ import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef)
 import TPL.Error                     (Result)
 import qualified TPL.Error as Err 
 import TPL.Parse                     (expressions)
-import TPL.Syntax                    (normalize)
+import TPL.Syntax                    (normalize, squash)
 import TPL.Value
 
 readExpr :: String -> Either Err.Error Term
@@ -24,10 +24,10 @@ readExpr expr = case parse expressions "TPL" expr of
 evalString :: EnvRef -> String -> IO String
 evalString env inp = showRes <$> runErrorT (Err.liftEither (readExpr inp) >>= eval env)
   where showRes (Left err)  = Err.showErrorStack err
-        showRes (Right res) = show res
+        showRes (Right res) = displayVal res
                         
 eval :: EnvRef -> Term -> Result Value
-eval env expr = do res <- liftIO . runErrorT $ go expr
+eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                    case res of
                      Left err  -> throwError $ Err.pushTrace err expr 
                      Right res -> return res
@@ -35,7 +35,7 @@ eval env expr = do res <- liftIO . runErrorT $ go expr
         go (NumericLiteral n)  = return $ Number n
         go (StringLiteral s)   = return $ String s
         go (BoolLiteral b)     = return $ Bool b
-        go name@Id{}           = do res <- getEnvRef (Symbol $ show name) env
+        go name@Id{}           = do res <- getEnvRef (Symbol $ display name) env
                                     case res of
                                       Function closure [] body -> eval closure body
                                       val                      -> return val

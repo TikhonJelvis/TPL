@@ -6,7 +6,7 @@ import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
 comment :: Parser ()
-comment = () <$ (string "--" *> many (noneOf "\n"))
+comment = () <$ (try $ string "--" *> many (noneOf "\n"))
 
 whitespace :: Parser ()
 whitespace = skipMany (() <$ oneOf " \t" <|> comment)
@@ -56,7 +56,7 @@ operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
         
 list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
-  where contents = expression `sepBy` char ',' <* allSpaces
+  where contents = expression `sepBy` (char ',' <* allSpaces)
 
 lambda :: Parser Term
 lambda = oneOf "\\λ" *> (Lambda <$> parameters <*> body)

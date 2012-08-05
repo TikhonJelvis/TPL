@@ -32,9 +32,9 @@ showError (BadOp op) = "Unknown operator " ++ op
 showError (Default str) = str
 showError (TypeMismatch expected got) = "Wrong type. Expected " ++ expected ++ "; got " ++ showType got ++ "."
 showError (MissingOperand op) = "Missing operand for " ++ op
-showError (UndefinedVariable var) = "Variable " ++ show var ++ "is not defined."
-showError (BadNativeCall name expr) = "Invalid native call to " ++ name ++ ": " ++ show expr ++ "." 
-showError (TooManyArguments fn) = "Too many arguments passed to " ++ show fn
+showError (UndefinedVariable var) = "Variable " ++ displayVal var ++ " is not defined."
+showError (BadNativeCall name expr) = "Invalid native call to " ++ name ++ ": " ++ display (Expression expr) ++ "." 
+showError (TooManyArguments fn) = "Too many arguments passed to " ++ displayVal fn
 
 showErrorStack :: Error -> String
 showErrorStack (Error stack err) = "Error: " ++ showError err ++ "\nStack Trace:\n" ++ intercalate "\n" (display <$> stack)

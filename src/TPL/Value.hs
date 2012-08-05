@@ -21,15 +21,6 @@ data Term = NullLiteral
           | Block [Term]
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq, Ord)
 
-data Value = Null
-           | Number Number
-           | String String
-           | Symbol String
-           | Bool Bool
-           | List [Value]
-           | Function EnvRef [Term] Term
-           | Object EnvRef deriving (Show, Eq, Ord)
-                                    
 display :: Term -> String
 display NullLiteral         = "null"
 display (Id name)           = name
@@ -45,7 +36,26 @@ display (ObjectLiteral _)   = "{...}" -- TODO: display object literals properly!
 
 displayList :: String -> [Term] -> String
 displayList sep = intercalate sep . map display
-             
+
+data Value = Null
+           | Number Number
+           | String String
+           | Symbol String
+           | Bool Bool
+           | List [Value]
+           | Function EnvRef [Term] Term
+           | Object EnvRef deriving (Show, Eq, Ord)
+
+displayVal :: Value -> String
+displayVal Null                   = "null"
+displayVal (Number n)             = show n
+displayVal (String s)             = show s
+displayVal (Symbol s)             = s
+displayVal (Bool b)               = if b then "true" else "false"
+displayVal (List vs)              = "[" ++ intercalate ", " (displayVal <$> vs) ++ "]"
+displayVal (Function _ args body) = display $ Lambda args body
+displayVal (Object r)             = "{...}"
+
 type Env = M.Map Value Value
                                     
 newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
