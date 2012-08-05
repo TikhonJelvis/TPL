@@ -37,7 +37,7 @@ showError (BadNativeCall name expr) = "Invalid native call to " ++ name ++ ": " 
 showError (TooManyArguments fn) = "Too many arguments passed to " ++ show fn
 
 showErrorStack :: Error -> String
-showErrorStack (Error stack err) = showError err ++ "\nStack Trace:\n" ++ intercalate "\n" (show <$> stack)
+showErrorStack (Error stack err) = "Error: " ++ showError err ++ "\nStack Trace:\n" ++ intercalate "\n" (display <$> stack)
 
 pushTrace :: Error -> Term -> Error
 pushTrace (Error stack err) term = Error (term:stack) err

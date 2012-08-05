@@ -42,5 +42,5 @@ defineEnvRef name val (EnvRef ref) = val <$ (modifyIORef ref $ defineEnv name va
 bindEnvRef :: [(Value, Value)] -> EnvRef -> IO EnvRef
 bindEnvRef bindings (EnvRef ref) = bindEnv bindings <$> readIORef ref >>= (EnvRef <$>) . newIORef
 
-getPrecs :: IO [(Term, Int)]
+getPrecs :: IO [(String, Int)]
 getPrecs = return []            -- TODO: Make this work!
