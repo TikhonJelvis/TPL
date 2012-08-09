@@ -5,26 +5,7 @@ import qualified Control.Monad.Error as E
 import Data.Functor                  ((<$>))
 import Data.List                     (intercalate)
 
-import Text.ParserCombinators.Parsec (ParseError)
-
 import TPL.Value
-
-type Result a = E.ErrorT Error IO a
-
-data Error = Error [Term] ErrorType deriving (Show)
-
-instance E.Error Error where
-  noMsg  = Error [] $ Default "Oh no, something went wrong!"
-  strMsg = Error [] . Default
-
-data ErrorType = Parser ParseError
-               | BadOp String
-               | MissingOperand String
-               | TypeMismatch String Value
-               | UndefinedVariable Value
-               | BadNativeCall String [Term]
-               | TooManyArguments Value
-               | Default String deriving (Show)
 
 showError :: ErrorType -> String
 showError (Parser err) = show err

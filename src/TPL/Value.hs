@@ -1,13 +1,24 @@
 module TPL.Value where
 
+import qualified Control.Monad.Error as E
+
 import Data.Functor            ((<$>))
 import Data.IORef
 import Data.List               (intercalate)
 import qualified Data.Map as M
 
+import Text.ParserCombinators.Parsec (ParseError)
+
 type Number = Integer
 
-data Code = Code {term :: Term, code :: String} deriving (Show, Eq, Ord)
+data NativeOpr = NativeOpr String Int ([Term] -> Result Value)
+
+instance Eq NativeOpr where
+  NativeOpr name args _ == NativeOpr name' args' _ = name == name' && args == args'
+  
+instance Show NativeOpr where show (NativeOpr name _ _) = "<Native: " ++ name ++ ">" -- TODO: Deal with number of arguments?
+instance Ord NativeOpr where
+  compare (NativeOpr name args _) (NativeOpr name' args' _) = compare (name, args) (name', args')
 
 data Term = NullLiteral
           | Id String
@@ -44,7 +55,8 @@ data Value = Null
            | Bool Bool
            | List [Value]
            | Function EnvRef [Term] Term
-           | Object EnvRef deriving (Show, Eq, Ord)
+           | Object EnvRef
+           | Native NativeOpr deriving (Show, Eq, Ord)
 
 displayVal :: Value -> String
 displayVal Null                   = "null"
@@ -55,6 +67,7 @@ displayVal (Bool b)               = if b then "true" else "false"
 displayVal (List vs)              = "[" ++ intercalate ", " (displayVal <$> vs) ++ "]"
 displayVal (Function _ args body) = display $ Lambda args body
 displayVal (Object r)             = "{...}"
+displayVal (Native opr)          = "<Native: " ++ show opr ++ ">"
 
 type Env = M.Map Value Value
                                     
@@ -74,3 +87,21 @@ showType Bool{}     = "bool"
 showType List{}     = "list"
 showType Function{} = "function"
 showType Object{}   = "object"
+
+                      -- Error-handling:
+type Result a = E.ErrorT Error IO a
+
+data Error = Error [Term] ErrorType deriving (Show)
+
+instance E.Error Error where
+  noMsg  = Error [] $ Default "Oh no, something went wrong!"
+  strMsg = Error [] . Default
+
+data ErrorType = Parser ParseError
+               | BadOp String
+               | MissingOperand String
+               | TypeMismatch String Value
+               | UndefinedVariable Value
+               | BadNativeCall String [Term]
+               | TooManyArguments Value
+               | Default String deriving (Show)

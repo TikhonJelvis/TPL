@@ -10,11 +10,11 @@ import Data.Map                      (fromList)
 import Text.ParserCombinators.Parsec (parse)
 
 import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef)
-import TPL.Error                     (Result)
 import qualified TPL.Error as Err 
+import TPL.Native                    (curryOpr)
 import TPL.Parse                     (expressions)
 import TPL.Syntax                    (normalize, squash)
-import TPL.Value
+import TPL.Value as Err
 
 readExpr :: String -> Either Err.Error Term
 readExpr expr = case parse expressions "TPL" expr of
@@ -45,11 +45,13 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                 evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM apply fn args
                 evalExpr expr                    = eval env expr
 
-                apply fn@(Function _ [] _) _ = Err.throw $ Err.TooManyArguments fn
-                apply fn@(Function cl [p] body) arg = getArgEnv p arg cl >>= (`eval` body)
-                apply fn@(Function cl (p:ps) body) arg = do cl' <- getArgEnv p arg cl
-                                                            return $ Function cl' ps body
-                apply fn _ = Err.throw $ Err.TypeMismatch "function" fn
+                apply fn@(Function _ [] _) _              = Err.throw $ Err.TooManyArguments fn
+                apply fn@(Function cl [p] body) arg       = getArgEnv p arg cl >>= (`eval` body)
+                apply fn@(Function cl (p:ps) body) arg    = do cl' <- getArgEnv p arg cl
+                                                               return $ Function cl' ps body
+                apply fn@(Native (NativeOpr _ 1 opr)) arg = opr [arg]
+                apply fn@(Native opr@NativeOpr{}) arg     = curryOpr opr arg
+                apply fn _                                = Err.throw $ Err.TypeMismatch "function" fn
 
                 getArgEnv (Id name) arg oldEnv = do val <- eval env arg
                                                     liftIO $ bindEnvRef [(Symbol name, val)] oldEnv
@@ -63,7 +65,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (ObjectLiteral bindings) = Object . EnvRef <$> newRef
           where newRef = bindings' >>= liftIO . newIORef . fromList
                 bindings' = mapM evalBinding bindings
-                evalBinding (key, val) = (,) <$> eval env key <*> eval env val 
+                evalBinding (key, val) = (,) <$> eval env key <*> eval env val
 
 defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
