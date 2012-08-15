@@ -7,6 +7,7 @@ import Data.IORef          (readIORef, writeIORef, modifyIORef, newIORef)
 import qualified Data.Map as M
 
 import TPL.Error
+import TPL.Native
 import TPL.Value
 
 und :: Value -> Error

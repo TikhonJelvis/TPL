@@ -2,6 +2,7 @@ module TPL.Run (repl, runFile) where
  
 import System.IO
 
+import TPL.Env
 import TPL.Eval
 import TPL.Value
 
@@ -19,9 +20,9 @@ until_ predicate prompt action =
        else action result >> until_ predicate prompt action
 
 repl :: IO () 
-repl = do env  <- nullEnv
+repl = do env  <- baseEnv
           until_ (== "quit") (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path
-                  nullEnv >>= (`evalString` code) >>= putStrLn
+                  baseEnv >>= (`evalString` code) >>= putStrLn

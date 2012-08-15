@@ -1,6 +1,7 @@
 module TPL.Eval where
 
 import Control.Applicative           ((<$>), (<*>))
+import Control.Arrow                 (first, second)
 import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM)
 
 import Data.IORef                    (newIORef)
@@ -10,6 +11,7 @@ import Text.ParserCombinators.Parsec (parse)
 
 import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef)
 import qualified TPL.Error as Err 
+import TPL.Native
 import TPL.Parse                     (expressions)
 import TPL.Syntax                    (normalize, squash)
 import TPL.Value as Err
@@ -48,7 +50,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                 apply (Function cl [p] body) arg    = getArgEnv p arg cl >>= (`eval` body)
                 apply (Function cl (p:ps) body) arg = do cl' <- getArgEnv p arg cl
                                                          return $ Function cl' ps body
-                apply (Native (NativeOpr opr)) arg  = opr arg
+                apply (Native (NativeOpr opr)) arg  = opr env arg
                 apply fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
                 getArgEnv (Id name) arg oldEnv = do val <- eval env arg
@@ -68,3 +70,21 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
 
 defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
+
+                 -- Native functions:
+instance (Extract a, Pack b) => Pack (a -> b) where
+  pack f = Native $ NativeOpr wrapped
+    where wrapped env x = do argVal <- eval env x
+                             return . pack . f $ extract argVal
+
+natives :: [(Value, Value)]
+natives = first Symbol <$> (convert math ++ convert comp)
+  where convert :: Pack a => [(String, a)] -> [(String, Value)]
+        convert = (second pack <$>)
+        math :: [(String, Integer -> Integer -> Integer)]
+        math = [("+", (+)), ("-", (-)), ("*", (*)), ("/", div)]
+        comp :: [(String, Integer -> Integer -> Bool)]
+        comp = [(">", (>)), ("<", (<)), ("<=", (<=)), (">=", (>=))]
+        
+baseEnv :: IO EnvRef
+baseEnv = nullEnv >>= bindEnvRef natives

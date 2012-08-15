@@ -11,7 +11,7 @@ import Text.ParserCombinators.Parsec (ParseError)
 
 type Number = Integer
 
-data NativeOpr = NativeOpr (Term -> Result Value)
+data NativeOpr = NativeOpr (EnvRef -> Term -> Result Value)
 
 instance Eq NativeOpr where _ == _ = False
   
