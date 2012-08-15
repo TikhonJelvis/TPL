@@ -8,7 +8,7 @@ import TPL.Value
 comment :: Parser ()
 comment = () <$ (try $ string "--" *> many (noneOf "\n"))
 
-whitespace :: Parser ()
+whitespace :: Parser () 
 whitespace = skipMany (() <$ oneOf " \t" <|> comment)
 
 allSpaces :: Parser ()

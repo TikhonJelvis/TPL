@@ -5,7 +5,6 @@ import Control.Monad.Error (throwError, liftIO)
 import Data.Functor        ((<$>), (<$))
 import Data.IORef          (readIORef, writeIORef, modifyIORef, newIORef)
 import qualified Data.Map as M
-import Data.Maybe          (fromMaybe)
 
 import TPL.Error
 import TPL.Value

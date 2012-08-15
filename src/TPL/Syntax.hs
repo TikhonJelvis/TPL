@@ -5,8 +5,6 @@ import Data.Functor  ((<$>))
 import Data.List     (groupBy)
 import Data.Maybe    (fromMaybe)
 
-import Debug.Trace   (trace)
-
 import TPL.Value
 
 defaultPrecedence :: Int

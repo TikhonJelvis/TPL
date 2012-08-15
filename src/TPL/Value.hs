@@ -11,14 +11,12 @@ import Text.ParserCombinators.Parsec (ParseError)
 
 type Number = Integer
 
-data NativeOpr = NativeOpr String Int ([Term] -> Result Value)
+data NativeOpr = NativeOpr (Term -> Result Value)
 
-instance Eq NativeOpr where
-  NativeOpr name args _ == NativeOpr name' args' _ = name == name' && args == args'
+instance Eq NativeOpr where _ == _ = False
   
-instance Show NativeOpr where show (NativeOpr name _ _) = "<Native: " ++ name ++ ">" -- TODO: Deal with number of arguments?
-instance Ord NativeOpr where
-  compare (NativeOpr name args _) (NativeOpr name' args' _) = compare (name, args) (name', args')
+instance Show NativeOpr where show = const "<native code>"
+instance Ord NativeOpr where compare _ _ = EQ
 
 data Term = NullLiteral
           | Id String
@@ -66,7 +64,7 @@ displayVal (Symbol s)             = s
 displayVal (Bool b)               = if b then "true" else "false"
 displayVal (List vs)              = "[" ++ intercalate ", " (displayVal <$> vs) ++ "]"
 displayVal (Function _ args body) = display $ Lambda args body
-displayVal (Object r)             = "{...}"
+displayVal (Object _)             = "{...}"
 displayVal (Native opr)          = "<Native: " ++ show opr ++ ">"
 
 type Env = M.Map Value Value
@@ -87,6 +85,8 @@ showType Bool{}     = "bool"
 showType List{}     = "list"
 showType Function{} = "function"
 showType Object{}   = "object"
+showType Native{}   = "native"
+showType Symbol{}   = "symbol"
 
                       -- Error-handling:
 type Result a = E.ErrorT Error IO a

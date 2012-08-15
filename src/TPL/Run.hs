@@ -1,7 +1,5 @@
 module TPL.Run (repl, runFile) where
  
-import System.Directory
-import System.Environment
 import System.IO
 
 import TPL.Eval

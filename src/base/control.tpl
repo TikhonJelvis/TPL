@@ -14,7 +14,7 @@ switch value [case, rest...] := (
   compare [condition, res] test := condition = test --> res
   compare case value | (is rest --> switch value rest)
 )
-cond [[condition, result], rest...] := is condition --> (condition ? result @ cond rest)
+cond [[condition, result], rest...] := (is condition | is result) --> (condition ? result @ cond rest)
 
 for $x $in ls $body := map (λ item -> with [x -> item] body) ls
 
