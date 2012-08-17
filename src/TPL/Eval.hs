@@ -41,7 +41,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                                     case res of
                                       Function closure [] body -> eval closure body
                                       val                      -> return val
-        go e@Expression{}      = (`normalize` e) <$> liftIO getPrecs >>= evalExpr
+        go e@Expression{}      = (`normalize` e) <$> getPrecs env >>= evalExpr
           where evalExpr (Expression [])         = return Null
                 evalExpr (Expression [term])     = eval env term
                 evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM apply fn args
@@ -91,25 +91,25 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
         math = [("+", (+)), ("-", (-)), ("*", (*)), ("/", div)]
         comp :: [(String, Integer -> Integer -> Bool)]
         comp = [(">", (>)), ("<", (<)), ("<=", (<=)), (">=", (>=))]
-        rest = [("=", pack eqOp),
-                ("><", pack ((++) :: String -> String -> String)),
-                ("substr", pack $ \ s i j -> drop i $ take j (s :: String)),
-                ("typeof", pack showType),
-                ("_if", pack if'), 
-                ("puts", pack putStrLn),
-                ("open", pack readFile),
-                ("toString", pack displayVal),
+        rest = [("=",            pack eqOp),
+                ("><",           pack ((++) :: String -> String -> String)),
+                ("substr",       pack $ \ s i j -> drop i $ take j (s :: String)),
+                ("typeof",       pack showType),
+                ("_if",          pack if'), 
+                ("puts",         pack putStrLn),
+                ("open",         pack readFile),
+                ("toString",     pack displayVal),
                 ("exprToString", pack exprToString),
-                (":=", pack $ execOnId defineEnvRef),
-                ("<-", pack $ execOnId setEnvRef),
-                ("#", pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
-                ("get", pack $ \ env term -> eval env term >>= getEnvRef env),
-                ("set", pack $ \ env term value -> eval env term >>= flip (setEnvRef env) value),
-                ("define", pack $ \ env term value -> eval env term >>= flip (defineEnvRef env) value),
-                ("getObj", pack getEnvRef),
-                ("setObj", pack setEnvRef),
-                ("defineObj", pack defineEnvRef),
-                ("with", pack with)]
+                (":=",           pack $ execOnId defineEnvRef),
+                ("<-",           pack $ execOnId setEnvRef),
+                ("#",            pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
+                ("get",          pack $ \ env term -> eval env term >>= getEnvRef env),
+                ("set",          pack $ \ env term value -> eval env term >>= flip (setEnvRef env) value),
+                ("define",       pack $ \ env term value -> eval env term >>= flip (defineEnvRef env) value),
+                ("getObj",       pack getEnvRef),
+                ("setObj",       pack setEnvRef),
+                ("defineObj",    pack defineEnvRef),
+                ("with",         pack with)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
                 if' (Bool res) env a b = if res then eval env a else eval env b
