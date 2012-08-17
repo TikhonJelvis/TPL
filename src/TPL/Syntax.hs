@@ -14,7 +14,7 @@ possiblePrecedences :: [Int]
 possiblePrecedences = [1..11]
 
 normalize :: [(String, Int)] -> Term -> Term -- Take care of operator precedence and sections
-normalize precs = desugar . handleInfix
+normalize precs = unReifyApps . desugar . handleInfix . reifyApps
   where handleInfix (Expression expr) = squash . Expression $ foldl1 (.) handleAll expr'
           where expr' = squash . Expression <$> groupBy ((==) `on` isOp) expr
                 handleAll = handle <$> possiblePrecedences
@@ -26,6 +26,16 @@ normalize precs = desugar . handleInfix
                 handle _ val            = val
         handleInfix val = val
         
+        app = "*application*"
+        reifyApps (Expression ls) = Expression $ go ls
+          where go (a:b:rest) | not $ isOp b || isOp a = a : Operator app : go (b:rest)
+                              | otherwise           = a : go (b:rest)
+                go a                                = a
+        reifyApps x               = x
+        unReifyApps (Expression [op, a, b]) | op == Id app = Expression [a, b]
+                                            | otherwise   = Expression [op, a, b]
+        unReifyApps x                                     = x
+
         getPrec (Operator str) = fromMaybe defaultPrecedence $ lookup str precs
         getPrec _              = defaultPrecedence
 

@@ -44,4 +44,4 @@ bindEnvRef :: [(Value, Value)] -> EnvRef -> IO EnvRef
 bindEnvRef bindings (EnvRef ref) = bindEnv bindings <$> readIORef ref >>= (EnvRef <$>) . newIORef
 
 getPrecs :: IO [(String, Int)]
-getPrecs = return []            -- TODO: Make this work!
+getPrecs = return [("+", 4), ("*", 5), ("*application", 9), ("#", 10)]            -- TODO: Make this work!

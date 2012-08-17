@@ -116,12 +116,15 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
                 displayExp (Function _ [] exp) = return . String $ display exp
                 displayExp v = Err.throw $ TypeMismatch "function" v
-                execOnId fn env (Id x) rval = eval env rval >>= fn env (String x)
-                execOnId fn env (Expression ((Id "#"):obj:rest)) rval = eval env obj >>= go
-                  where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval
-                        go v            = Err.throw $ TypeMismatch "object" v
-                execOnId fn env (Expression (fname@Id{}:args)) rval = execOnId fn env fname $ Lambda args rval
-                execOnId _ _ v _             = Err.throw $ BadIdentifier v
+                execOnId fn env inp rval = exec $ simplify inp
+                  where simplify (Expression ((Expression ls):rest)) = Expression $ ls ++ rest
+                        simplify x                                   = x
+                        exec (Id x)                           = eval env rval >>= fn env (String x)
+                        exec (Expression ((Id "#"):obj:rest)) = eval env obj >>= go
+                          where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval
+                                go v            = Err.throw $ TypeMismatch "object" v
+                        exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
+                        exec v                              = Err.throw $ BadIdentifier v
                 with (Object ref) (Function _ args body) = return $ Function ref args body
                 with Object{} f                          = Err.throw $ TypeMismatch "function" f
                 with o _                                 = Err.throw $ TypeMismatch "object" o
