@@ -19,6 +19,7 @@ showError (TooManyArguments fn) = "Too many arguments passed to " ++ displayVal 
 showError (BadIdentifier term) =  "Invalid name: " ++ display term
 
 showErrorStack :: Error -> String
+showErrorStack (Error [] err) = "Error: " ++ showError err ++ "!"
 showErrorStack (Error stack err) = "Error: " ++ showError err ++ "!\nStack Trace:\n" ++ intercalate "\n" (display <$> stack)
 
 pushTrace :: Error -> Term -> Error

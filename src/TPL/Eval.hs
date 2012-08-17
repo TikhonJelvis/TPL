@@ -5,8 +5,8 @@ import Control.Applicative           ((<$>), (<*>), (<$))
 import Control.Arrow                 (first, second)
 import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM, (=<<))
 
-import Data.IORef                    (newIORef)
-import Data.Map                      (fromList)
+import Data.IORef                    (newIORef, readIORef)
+import Data.Map                      (fromList, union)
 
 import Text.ParserCombinators.Parsec (parse)
 
@@ -104,7 +104,10 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("<-", pack $ execOnId setEnvRef),
                 ("get", pack getEnvRef),
                 ("set", pack setEnvRef),
-                ("define", pack defineEnvRef)]
+                ("define", pack defineEnvRef),
+                ("with", pack with),
+                ("merge", pack mergeEnvRefs),
+                ("withCurrent", pack withCurrent)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
                 substr s i j = drop i $ take j (s :: String)
@@ -112,6 +115,17 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
                 execOnId fn env (Id x) value = fn env (String x) value
                 execOnId _ _ v _             = Err.throw $ BadIdentifier v
+                with (Object ref) (Function _ args body) = return $ Function ref args body
+                with Object{} f                          = Err.throw $ TypeMismatch "function" f
+                with o _                                 = Err.throw $ TypeMismatch "object" o
+                mergeEnvRefs (EnvRef e1) (EnvRef e2) = do e1' <- readIORef e1
+                                                          e2' <- readIORef e2
+                                                          EnvRef <$> (newIORef $ union e1' e2')
+                withCurrent env obj fn = do obj' <- eval env obj
+                                            res <- case obj' of
+                                              Object ref -> liftIO $ mergeEnvRefs ref env
+                                              v          -> Err.throw $ TypeMismatch "object" v
+                                            with (Object res) fn
 
 baseEnv :: IO EnvRef
 baseEnv = nullEnv >>= bindEnvRef natives
