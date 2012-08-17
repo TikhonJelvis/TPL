@@ -20,15 +20,16 @@ setEnv :: Value -> Value -> Env -> Either Error Env
 setEnv name val env = maybe (Left $ und name) (const newEnv) $ M.lookup name env
   where newEnv = Right $ M.insert name val env
         
-defineEnv :: Value -> Value -> Env -> Env 
+defineEnv :: Value -> Value -> Env -> Env
 defineEnv name val env = M.insert name val env
         
 bindEnv :: [(Value, Value)] -> Env -> Env
 bindEnv bindings env = M.union (M.fromList bindings) env
 
 getEnvRef :: EnvRef -> Value -> Result Value
-getEnvRef (EnvRef ref) name = do env <- liftIO $ readIORef ref
-                                 liftEither $ getEnv name env
+getEnvRef env (String "*current*") = return $ Object env
+getEnvRef (EnvRef ref) name        = do env <- liftIO $ readIORef ref
+                                        liftEither $ getEnv name env
 
 setEnvRef :: EnvRef -> Value -> Value -> Result Value
 setEnvRef (EnvRef ref) name val = do env <- liftIO $ readIORef ref

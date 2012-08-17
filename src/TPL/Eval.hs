@@ -93,39 +93,44 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
         comp = [(">", (>)), ("<", (<)), ("<=", (<=)), (">=", (>=))]
         rest = [("=", pack eqOp),
                 ("><", pack ((++) :: String -> String -> String)),
-                ("substr", pack substr),
+                ("substr", pack $ \ s i j -> drop i $ take j (s :: String)),
                 ("typeof", pack showType),
                 ("_if", pack if'), 
                 ("puts", pack putStrLn),
                 ("open", pack readFile),
                 ("toString", pack displayVal),
-                ("codeToString", pack display),
+                ("exprToString", pack exprToString),
                 (":=", pack $ execOnId defineEnvRef),
                 ("<-", pack $ execOnId setEnvRef),
-                ("get", pack getEnvRef),
-                ("set", pack setEnvRef),
-                ("define", pack defineEnvRef),
-                ("with", pack with),
-                ("merge", pack mergeEnvRefs),
-                ("withCurrent", pack withCurrent)]
+                ("#", pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
+                ("get", pack $ \ env term -> eval env term >>= getEnvRef env),
+                ("set", pack $ \ env term value -> eval env term >>= flip (setEnvRef env) value),
+                ("define", pack $ \ env term value -> eval env term >>= flip (defineEnvRef env) value),
+                ("getObj", pack getEnvRef),
+                ("setObj", pack setEnvRef),
+                ("defineObj", pack defineEnvRef),
+                ("with", pack with)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
-                substr s i j = drop i $ take j (s :: String)
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
-                execOnId fn env (Id x) value = fn env (String x) value
+                displayExp (Function _ [] exp) = return . String $ display exp
+                displayExp v = Err.throw $ TypeMismatch "function" v
+                execOnId fn env (Id x) rval = eval env rval >>= fn env (String x)
+                execOnId fn env (Expression ((Id "#"):obj:rest)) rval = eval env obj >>= go
+                  where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval
+                        go v            = Err.throw $ TypeMismatch "object" v
+                execOnId fn env (Expression (fname@Id{}:args)) rval = execOnId fn env fname $ Lambda args rval
                 execOnId _ _ v _             = Err.throw $ BadIdentifier v
                 with (Object ref) (Function _ args body) = return $ Function ref args body
                 with Object{} f                          = Err.throw $ TypeMismatch "function" f
                 with o _                                 = Err.throw $ TypeMismatch "object" o
-                mergeEnvRefs (EnvRef e1) (EnvRef e2) = do e1' <- readIORef e1
-                                                          e2' <- readIORef e2
-                                                          EnvRef <$> (newIORef $ union e1' e2')
-                withCurrent env obj fn = do obj' <- eval env obj
-                                            res <- case obj' of
-                                              Object ref -> liftIO $ mergeEnvRefs ref env
-                                              v          -> Err.throw $ TypeMismatch "object" v
-                                            with (Object res) fn
-
+                exprToString env (Id x) = getEnvRef env (String x) >>= displayDeferred
+                exprToString env term = eval env term >>= displayDeferred
+                displayDeferred (Function _ [] e) = return . String $ display e
+                displayDeferred v                 = Err.throw $ TypeMismatch "deferred expression" v
+                getObjId name (Object ref) = getEnvRef ref (String name)
+                getObjId name v            = Err.throw $ TypeMismatch "object" v
+                
 baseEnv :: IO EnvRef
 baseEnv = nullEnv >>= bindEnvRef natives
