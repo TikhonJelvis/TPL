@@ -35,6 +35,11 @@ instance Pack Bool where pack = Bool
 instance Extract Bool where
   extract (Bool b) = return b
   extract v        = Err.throw $ TypeMismatch "boolean" v
+  
+instance Pack EnvRef where pack = Object
+instance Extract EnvRef where
+  extract (Object ref) = return $ ref
+  extract v            = Err.throw $ TypeMismatch "object" v
                          
 instance Pack a => Pack [a] where pack = List . map pack
 

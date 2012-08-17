@@ -26,8 +26,8 @@ defineEnv name val env = M.insert name val env
 bindEnv :: [(Value, Value)] -> Env -> Env
 bindEnv bindings env = M.union (M.fromList bindings) env
 
-getEnvRef :: Value -> EnvRef -> Result Value
-getEnvRef name (EnvRef ref) = do env <- liftIO $ readIORef ref
+getEnvRef :: EnvRef -> Value -> Result Value
+getEnvRef (EnvRef ref) name = do env <- liftIO $ readIORef ref
                                  liftEither $ getEnv name env
 
 setEnvRef :: EnvRef -> Value -> Value -> Result Value

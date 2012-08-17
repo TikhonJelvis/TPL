@@ -101,4 +101,5 @@ data ErrorType = Parser ParseError
                | UndefinedVariable Value
                | BadNativeCall String [Term]
                | TooManyArguments Value
+               | BadIdentifier Term
                | Default String deriving (Show)

@@ -6,7 +6,7 @@ import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
 comment :: Parser ()
-comment = () <$ (try $ string "--" *> many (noneOf "\n"))
+comment = () <$ (try $ string "--" *> many (noneOf "\n")) <?> "comment"
 
 whitespace :: Parser () 
 whitespace = skipMany (() <$ oneOf " \t" <|> comment)
@@ -58,6 +58,12 @@ list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
   where contents = expression `sepBy` (char ',' <* allSpaces)
 
+object :: Parser Term
+object = char '{' *> allSpaces *> (ObjectLiteral <$> many binding) <* char '}' <* whitespace
+  where binding = (,) <$> (key <* allSpaces <* char ':')
+                      <*> (allSpaces *> expression <* end)
+        key = identifier <|> stringLiteral <|> num
+
 lambda :: Parser Term
 lambda = oneOf "\\λ" *> (Lambda <$> parameters <*> body)
   where parameters = allSpaces *> many argument
@@ -82,10 +88,16 @@ atom =  lambda
     <|> num
     <|> operator
     <|> list
+    <|> object
     <|> delayedExp
     <|> block
     
 expressions :: Parser Term
 expressions = allSpaces *> (Block <$> many (expression <* end))
+
+program :: Parser Term
+program = expressions <* eof
+
+end :: Parser ()
+end = (terminator *> allSpaces) <|> lookAhead (() <$ oneOf "})")
   where terminator = () <$ oneOf ";\n" <|> eof
-        end = (terminator *> allSpaces) <|> lookAhead (() <$ char ')')

@@ -13,12 +13,12 @@ import Text.ParserCombinators.Parsec (parse)
 import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef, defineEnvRef, setEnvRef)
 import qualified TPL.Error as Err 
 import TPL.Native
-import TPL.Parse                     (expressions)
+import TPL.Parse                     (program)
 import TPL.Syntax                    (normalize, squash)
 import TPL.Value as Err
 
 readExpr :: String -> Either Err.Error Term
-readExpr expr = case parse expressions "TPL" expr of
+readExpr expr = case parse program "TPL" expr of
   Left err  -> Left . Err.Error [] $ Err.Parser err
   Right val -> Right val
   
@@ -37,7 +37,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (NumericLiteral n)  = return $ Number n
         go (StringLiteral s)   = return $ String s
         go (BoolLiteral b)     = return $ Bool b
-        go name@Id{}           = do res <- getEnvRef (String $ display name) env
+        go name@Id{}           = do res <- getEnvRef env . String $ display name
                                     case res of
                                       Function closure [] body -> eval closure body
                                       val                      -> return val
@@ -67,7 +67,10 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (ObjectLiteral bindings) = Object . EnvRef <$> newRef
           where newRef = bindings' >>= liftIO . newIORef . fromList
                 bindings' = mapM evalBinding bindings
-                evalBinding (key, val) = (,) <$> eval env key <*> eval env val
+                evalBinding (key, val) = (,) <$> toString key <*> eval env val
+                toString (Id x) = return $ String x
+                toString (StringLiteral s) = return $ String s
+                toString v = Err.throw $ BadIdentifier v
 
 defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
@@ -98,14 +101,17 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("toString", pack displayVal),
                 ("codeToString", pack display),
                 (":=", pack $ execOnId defineEnvRef),
-                ("<-", pack $ execOnId setEnvRef)]
+                ("<-", pack $ execOnId setEnvRef),
+                ("get", pack getEnvRef),
+                ("set", pack setEnvRef),
+                ("define", pack defineEnvRef)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
                 substr s i j = drop i $ take j (s :: String)
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
                 execOnId fn env (Id x) value = fn env (String x) value
-                execOnId _ _ v _             = Err.throw . Default $ "Invalid variable name: " ++ display v
+                execOnId _ _ v _             = Err.throw $ BadIdentifier v
 
 baseEnv :: IO EnvRef
 baseEnv = nullEnv >>= bindEnvRef natives
