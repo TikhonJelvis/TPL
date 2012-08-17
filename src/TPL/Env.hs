@@ -30,14 +30,14 @@ getEnvRef :: Value -> EnvRef -> Result Value
 getEnvRef name (EnvRef ref) = do env <- liftIO $ readIORef ref
                                  liftEither $ getEnv name env
 
-setEnvRef :: Value -> Value -> EnvRef -> Result Value
-setEnvRef name val (EnvRef ref) = do env <- liftIO $ readIORef ref
+setEnvRef :: EnvRef -> Value -> Value -> Result Value
+setEnvRef (EnvRef ref) name val = do env <- liftIO $ readIORef ref
                                      case setEnv name val env of
-                                       Left err -> throwError err
+                                       Left err   -> throwError err
                                        Right env' -> val <$ liftIO (writeIORef ref env')
                                        
-defineEnvRef :: Value -> Value -> EnvRef  -> IO Value
-defineEnvRef name val (EnvRef ref) = val <$ (modifyIORef ref $ defineEnv name val)
+defineEnvRef :: EnvRef -> Value -> Value -> Result Value
+defineEnvRef (EnvRef ref) name val = liftIO $ val <$ (modifyIORef ref $ defineEnv name val)
 
 bindEnvRef :: [(Value, Value)] -> EnvRef -> IO EnvRef
 bindEnvRef bindings (EnvRef ref) = bindEnv bindings <$> readIORef ref >>= (EnvRef <$>) . newIORef

@@ -5,10 +5,10 @@ import System.Environment
 import TPL.Run
 
 version :: String
-version = "0.2.0"
+version = "0.3.0"
 
 welcome :: String
-welcome = "Welcome to TPL version " ++ version ++ "\n Type \"quit\" to quit."
+welcome = "Welcome to TPL version " ++ version ++ "\nType \"--quit\" to quit."
 
 main :: IO ()
 main = do args <- getArgs

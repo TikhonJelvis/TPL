@@ -1,15 +1,16 @@
+{-# LANGUAGE FlexibleInstances, OverlappingInstances, ScopedTypeVariables #-}
 module TPL.Eval where
 
-import Control.Applicative           ((<$>), (<*>))
+import Control.Applicative           ((<$>), (<*>), (<$))
 import Control.Arrow                 (first, second)
-import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM)
+import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM, (=<<))
 
 import Data.IORef                    (newIORef)
 import Data.Map                      (fromList)
 
 import Text.ParserCombinators.Parsec (parse)
 
-import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef)
+import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef, defineEnvRef, setEnvRef)
 import qualified TPL.Error as Err 
 import TPL.Native
 import TPL.Parse                     (expressions)
@@ -36,7 +37,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (NumericLiteral n)  = return $ Number n
         go (StringLiteral s)   = return $ String s
         go (BoolLiteral b)     = return $ Bool b
-        go name@Id{}           = do res <- getEnvRef (Symbol $ display name) env
+        go name@Id{}           = do res <- getEnvRef (String $ display name) env
                                     case res of
                                       Function closure [] body -> eval closure body
                                       val                      -> return val
@@ -54,9 +55,9 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                 apply fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
                 getArgEnv (Id name) arg oldEnv = do val <- eval env arg
-                                                    liftIO $ bindEnvRef [(Symbol name, val)] oldEnv
+                                                    liftIO $ bindEnvRef [(String name, val)] oldEnv
                 getArgEnv (Lambda [] (Id name)) arg oldEnv =
-                  liftIO $ bindEnvRef [(Symbol name, defer env arg)] oldEnv
+                  liftIO $ bindEnvRef [(String name, defer env arg)] oldEnv
                 getArgEnv _ _ _ = error "getArgEnv: names can only be ids or lambdas!"
         
         go (ListLiteral terms) = List <$> mapM (eval env) terms
@@ -72,19 +73,39 @@ defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
 
                  -- Native functions:
-instance (Extract a, Pack b) => Pack (a -> b) where
-  pack f = Native $ NativeOpr wrapped
-    where wrapped env x = do argVal <- eval env x
-                             return . pack . f $ extract argVal
+instance (Extract a, Pack b) => Pack (a -> Result b) where
+  pack f = native $ \ env x -> pack <$> (eval env x >>= extract >>= f)
+
+instance (Extract a, Pack b) => Pack (a -> IO b) where pack f = pack (liftIO . f :: a -> Result b)
+
+instance (Extract a, Pack b) => Pack (a -> b) where pack f = pack (return . f :: a -> Result b)
 
 natives :: [(Value, Value)]
-natives = first Symbol <$> (convert math ++ convert comp)
+natives = first String <$> (convert math ++ convert comp ++ rest)
   where convert :: Pack a => [(String, a)] -> [(String, Value)]
         convert = (second pack <$>)
         math :: [(String, Integer -> Integer -> Integer)]
         math = [("+", (+)), ("-", (-)), ("*", (*)), ("/", div)]
         comp :: [(String, Integer -> Integer -> Bool)]
         comp = [(">", (>)), ("<", (<)), ("<=", (<=)), (">=", (>=))]
-        
+        rest = [("=", pack eqOp),
+                ("><", pack ((++) :: String -> String -> String)),
+                ("substr", pack substr),
+                ("typeof", pack showType),
+                ("_if", pack if'), 
+                ("puts", pack putStrLn),
+                ("open", pack readFile),
+                ("toString", pack displayVal),
+                ("codeToString", pack display),
+                (":=", pack $ execOnId defineEnvRef),
+                ("<-", pack $ execOnId setEnvRef)]
+          where eqOp :: Value -> Value -> Value
+                eqOp a b = pack $ a == b
+                substr s i j = drop i $ take j (s :: String)
+                if' (Bool res) env a b = if res then eval env a else eval env b
+                if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
+                execOnId fn env (Id x) value = fn env (String x) value
+                execOnId _ _ v _             = Err.throw . Default $ "Invalid variable name: " ++ display v
+
 baseEnv :: IO EnvRef
 baseEnv = nullEnv >>= bindEnvRef natives

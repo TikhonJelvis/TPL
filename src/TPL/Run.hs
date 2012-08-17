@@ -21,7 +21,7 @@ until_ predicate prompt action =
 
 repl :: IO () 
 repl = do env  <- baseEnv
-          until_ (== "quit") (readPrompt "λ>") $ evalAndPrint env
+          until_ ((== "--quit") . dropWhile (/= '-')) (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path

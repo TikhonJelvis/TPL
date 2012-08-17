@@ -15,7 +15,7 @@ data NativeOpr = NativeOpr (EnvRef -> Term -> Result Value)
 
 instance Eq NativeOpr where _ == _ = False
   
-instance Show NativeOpr where show = const "<native code>"
+instance Show NativeOpr where show = const "[native code]"
 instance Ord NativeOpr where compare _ _ = EQ
 
 data Term = NullLiteral
@@ -49,7 +49,6 @@ displayList sep = intercalate sep . map display
 data Value = Null
            | Number Number
            | String String
-           | Symbol String
            | Bool Bool
            | List [Value]
            | Function EnvRef [Term] Term
@@ -60,12 +59,11 @@ displayVal :: Value -> String
 displayVal Null                   = "null"
 displayVal (Number n)             = show n
 displayVal (String s)             = show s
-displayVal (Symbol s)             = s
 displayVal (Bool b)               = if b then "true" else "false"
 displayVal (List vs)              = "[" ++ intercalate ", " (displayVal <$> vs) ++ "]"
-displayVal (Function _ args body) = display $ Lambda args body
+displayVal (Function _ args body) = "<λ>: " ++ displayList " " args ++ " → "++ display body
 displayVal (Object _)             = "{...}"
-displayVal (Native opr)          = "<Native: " ++ show opr ++ ">"
+displayVal (Native opr)          = "<λ>: " ++ show opr
 
 type Env = M.Map Value Value
                                     
@@ -86,7 +84,6 @@ showType List{}     = "list"
 showType Function{} = "function"
 showType Object{}   = "object"
 showType Native{}   = "native"
-showType Symbol{}   = "symbol"
 
                       -- Error-handling:
 type Result a = E.ErrorT Error IO a
