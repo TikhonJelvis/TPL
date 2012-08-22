@@ -11,7 +11,6 @@ welcome :: String
 welcome = "Welcome to TPL version " ++ version ++ "\nType \"--quit\" to quit."
 
 main :: IO ()
-main = do args <- getArgs
-          case args of
-            [] -> putStrLn welcome >> repl
-            ls -> mapM_ runFile ls
+main = getArgs >>= go
+  where go [] = putStrLn welcome >> repl
+        go ls = mapM_ runFile ls

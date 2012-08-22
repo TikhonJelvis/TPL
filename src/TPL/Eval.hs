@@ -121,7 +121,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                         simplify x                                   = x
                         exec (Id x)                           = eval env rval >>= fn env (String x)
                         exec (Expression ((Id "#"):obj:rest)) = eval env obj >>= go
-                          where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval
+                          where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval -- TODO: Make scoping work!
                                 go v            = Err.throw $ TypeMismatch "object" v
                         exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
                         exec v                              = Err.throw $ BadIdentifier v

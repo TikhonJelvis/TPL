@@ -47,7 +47,8 @@ Cabal-version:       >=1.9.2
 Library
   Build-depends:       base, containers, directory, mtl, parsec >= 3
   Hs-source-dirs:      src
-  Exposed-modules:     TPL.Parse
+  Exposed-modules:     TPL.Parse, TPL.Env, TPL.Error, TPL.Eval, TPL.Native, TPL.Pattern,
+                       TPL.Run, TPL.Syntax, TPL.Value
   GHC-options:         -Wall -fno-warn-unused-do-bind 
 
 Executable tpl
