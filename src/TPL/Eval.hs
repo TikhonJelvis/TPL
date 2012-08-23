@@ -1,12 +1,13 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances, OverlappingInstances, ScopedTypeVariables #-}
 module TPL.Eval where
 
-import Control.Applicative           ((<$>), (<*>), (<$))
+import Control.Applicative           ((<$>), (<*>))
 import Control.Arrow                 (first, second)
-import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM, (=<<))
+import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM)
 
-import Data.IORef                    (newIORef, readIORef)
-import Data.Map                      (fromList, union)
+import Data.IORef                    (newIORef)
+import Data.Map                      (fromList)
 
 import Text.ParserCombinators.Parsec (parse)
 
@@ -115,10 +116,8 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 eqOp a b = pack $ a == b
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
-                displayExp (Function _ [] exp) = return . String $ display exp
-                displayExp v = Err.throw $ TypeMismatch "function" v
                 execOnId fn env inp rval = exec $ simplify inp
-                  where simplify (Expression ((Expression ls):rest)) = Expression $ ls ++ rest
+                  where simplify (Expression ((Expression ls):tl)) = Expression $ ls ++ tl
                         simplify x                                   = x
                         exec (Id x)                           = eval env rval >>= fn env (String x)
                         exec (Expression ((Id "#"):obj:(Id name):args)) = eval env obj >>= go
@@ -136,7 +135,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 displayDeferred (Function _ [] e) = return . String $ display e
                 displayDeferred v                 = Err.throw $ TypeMismatch "deferred expression" v
                 getObjId name (Object ref) = getEnvRef ref (String name)
-                getObjId name v            = Err.throw $ TypeMismatch "object" v
+                getObjId _ v               = Err.throw $ TypeMismatch "object" v
                 
 baseEnv :: IO EnvRef
 baseEnv = nullEnv >>= bindEnvRef natives

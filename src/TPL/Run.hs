@@ -23,8 +23,8 @@ until_ predicate prompt action =
 repl :: IO () 
 repl = do env  <- baseEnv
           path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
-          evalString env $ "TPL_PATH := '" ++ path ++ "'"
-          evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
+          _    <- evalString env $ "TPL_PATH := '" ++ path ++ "'"
+          _    <- evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
           until_ ((== "--quit") . dropWhile (/= '-')) (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()

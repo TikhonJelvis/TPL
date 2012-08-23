@@ -1,9 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, IncoherentInstances, UndecidableInstances #-}
 module TPL.Native where
 
-import Control.Arrow (first, second)
-import Data.Functor  ((<$>))
-
 import qualified TPL.Error as Err
 import TPL.Value
 
