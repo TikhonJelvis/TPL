@@ -118,10 +118,13 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = Err.throw $ TypeMismatch "boolean" v
                 execOnId fn env inp rval = exec $ simplify inp
-                  where simplify (Expression ((Expression ls):tl)) = Expression $ ls ++ tl
-                        simplify x                                   = x
-                        exec (Id x)                           = eval env rval >>= fn env (String x)
-                        exec (Expression ((Id "#"):obj:(Id name):args)) = eval env obj >>= go
+                  where simplify (Expression terms) = Expression $ terms >>= flattenExprs
+                        simplify x                  = x
+                        flattenExprs (Expression e) = e >>= flattenExprs
+                        flattenExprs e              = [e]
+                        exec (Id x) = eval env rval >>= fn env (String x)
+                        exec (Expression ((Id "#"):obj:(Id name):args)) =
+                          eval env obj >>= go
                           where go (Object ref)
                                   | null args = eval env rval >>= fn ref (String name)
                                   | otherwise = eval env (Lambda args rval) >>= fn ref (String name)

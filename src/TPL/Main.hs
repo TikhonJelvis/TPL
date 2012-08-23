@@ -5,7 +5,7 @@ import System.Environment
 import TPL.Run
 
 version :: String
-version = "0.3.0"
+version = "0.4.0"
 
 welcome :: String
 welcome = "Welcome to TPL version " ++ version ++ "\nType \"--quit\" to quit."
