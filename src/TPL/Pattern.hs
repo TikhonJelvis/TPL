@@ -1,5 +1,7 @@
 module TPL.Pattern (unify) where
 
+import Control.Arrow (second)
+
 import TPL.Value
 
 unify :: Term -> Value -> [(String, Value)]

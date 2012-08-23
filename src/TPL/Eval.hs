@@ -56,6 +56,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                 apply (Native (NativeOpr opr)) arg  = opr env arg
                 apply fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
+                getArgEnv (Lambda [] n) arg oldEnv = getArgEnv n (Lambda [] arg) oldEnv
                 getArgEnv name arg oldEnv = do val <- eval env arg
                                                let unified = first String <$> unify name val
                                                liftIO $ bindEnvRef unified oldEnv

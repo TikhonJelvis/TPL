@@ -20,13 +20,17 @@ until_ predicate prompt action =
        then return ()
        else action result >> until_ predicate prompt action
 
+prelude :: IO EnvRef
+prelude = do env <- baseEnv
+             path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
+             _    <- evalString env $ "TPL_PATH := '" ++ path ++ "'"
+             _    <- evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"   
+             return $ env
+
 repl :: IO () 
-repl = do env  <- baseEnv
-          path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
-          _    <- evalString env $ "TPL_PATH := '" ++ path ++ "'"
-          _    <- evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
+repl = do env  <- prelude
           until_ ((== "--quit") . dropWhile (/= '-')) (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
 runFile path = do code <- readFile path
-                  baseEnv >>= (`evalString` code) >>= putStrLn
+                  prelude >>= (`evalString` code) >>= putStrLn
