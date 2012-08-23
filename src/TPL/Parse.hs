@@ -74,7 +74,7 @@ delayedExp :: Parser Term
 delayedExp = char '$' *> allSpaces *> (Lambda [] <$> atom) 
 
 block :: Parser Term
-block = between (char '(' *> allSpaces) (char ')' *> allSpaces) expressions
+block = between (char '(' *> allSpaces) (char ')' *> whitespace) expressions
 
 expression :: Parser Term
 expression = Expression <$> many1 atom <?> "expression" 

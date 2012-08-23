@@ -14,6 +14,7 @@ import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef, defineEnv
 import qualified TPL.Error as Err 
 import TPL.Native
 import TPL.Parse                     (program)
+import TPL.Pattern                   (unify)
 import TPL.Syntax                    (normalize, squash)
 import TPL.Value as Err
 
@@ -54,11 +55,9 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                 apply (Native (NativeOpr opr)) arg  = opr env arg
                 apply fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
-                getArgEnv (Id name) arg oldEnv = do val <- eval env arg
-                                                    liftIO $ bindEnvRef [(String name, val)] oldEnv
-                getArgEnv (Lambda [] (Id name)) arg oldEnv =
-                  liftIO $ bindEnvRef [(String name, defer env arg)] oldEnv
-                getArgEnv _ _ _ = error "getArgEnv: names can only be ids or lambdas!"
+                getArgEnv name arg oldEnv = do val <- eval env arg
+                                               let unified = first String <$> unify name val
+                                               liftIO $ bindEnvRef unified oldEnv
         
         go (ListLiteral terms) = List <$> mapM (eval env) terms
         go (Lambda args body)  = return $ Function env args body
@@ -92,10 +91,11 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
         comp :: [(String, Integer -> Integer -> Bool)]
         comp = [(">", (>)), ("<", (<)), ("<=", (<=)), (">=", (>=))]
         rest = [("=",            pack eqOp),
+                (":",            pack ((:) :: Value -> [Value] -> [Value])),
                 ("><",           pack ((++) :: String -> String -> String)),
                 ("substr",       pack $ \ s i j -> drop i $ take j (s :: String)),
                 ("typeof",       pack showType),
-                ("_if",          pack if'), 
+                ("if",           pack if'), 
                 ("puts",         pack putStrLn),
                 ("open",         pack readFile),
                 ("toString",     pack displayVal),
@@ -109,6 +109,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("getObj",       pack getEnvRef),
                 ("setObj",       pack setEnvRef),
                 ("defineObj",    pack defineEnvRef),
+                ("loadObj",      pack $ \ env path -> liftIO (readFile path) >>= Err.liftEither . readExpr >>= eval env),
                 ("with",         pack with)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
@@ -120,8 +121,10 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                   where simplify (Expression ((Expression ls):rest)) = Expression $ ls ++ rest
                         simplify x                                   = x
                         exec (Id x)                           = eval env rval >>= fn env (String x)
-                        exec (Expression ((Id "#"):obj:rest)) = eval env obj >>= go
-                          where go (Object ref) = execOnId fn ref (squash $ Expression rest) rval -- TODO: Make scoping work!
+                        exec (Expression ((Id "#"):obj:(Id name):args)) = eval env obj >>= go
+                          where go (Object ref)
+                                  | null args = eval env rval >>= fn ref (String name)
+                                  | otherwise = eval env (Lambda args rval) >>= fn ref (String name)
                                 go v            = Err.throw $ TypeMismatch "object" v
                         exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
                         exec v                              = Err.throw $ BadIdentifier v

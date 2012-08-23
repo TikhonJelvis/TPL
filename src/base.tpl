@@ -1,19 +1,32 @@
-force x := x
+define "*precs*" {
+    "+" : 5
+    "-" : 5
+    "*" : 6
+    "/" : 6
+    "%" : 6
+    ":=" : 2
+    "<-" : 2
+    "=" : 3
+    "/=" : 3
+    ":" : 4
+    "*application*" : 10
+    "#" : 11
+}
 
-print x := _print x
+precedence $op n := defineObj (get "*precs*") (exprToString op) n
+precedenceOf $op := getObj (get "*precs*") (exprToString op)
 
-precedence (+)  5
-precedence (-)  5
-precedence (*)  4
-precedence (/)  4
-precedence (=)  7
-precedence (/)  7
-precedence (:)  9
-precedence (!)  6
-precedence (:=) 11
-precedence (<-) 11
+print x := puts (toString x)
 
-if cond $then $_ $else := force (_if cond $then $else)
+_modules := []
+require f := (
+    inLs e [x, xs...] := if (x = null) false (if (x = e) true (inLs e xs))
+    if (inLs f _modules) null (
+        fullName := TPL_PATH >< '/' >< f >< '.tpl'
+        loadObj (get "*current*") fullName
+        _modules <- f : _modules
+    )
+)
 
 let $bindings $body := with bindings body
 

@@ -1,9 +1,10 @@
 module TPL.Run (repl, runFile) where
  
+import System.Directory   (getCurrentDirectory)
+import System.Environment (getEnv)
 import System.IO
 
-import TPL.Env
-import TPL.Eval
+import TPL.Eval           (baseEnv, evalString)
 import TPL.Value
 
 readPrompt :: String -> IO String
@@ -21,6 +22,9 @@ until_ predicate prompt action =
 
 repl :: IO () 
 repl = do env  <- baseEnv
+          path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
+          evalString env $ "TPL_PATH := '" ++ path ++ "'"
+          evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
           until_ ((== "--quit") . dropWhile (/= '-')) (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()

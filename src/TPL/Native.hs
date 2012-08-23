@@ -42,6 +42,9 @@ instance Extract EnvRef where
   extract v            = Err.throw $ TypeMismatch "object" v
                          
 instance Pack a => Pack [a] where pack = List . map pack
+instance Extract [Value] where
+  extract (List vals) = return $ vals
+  extract v           = Err.throw $ TypeMismatch "list" v
 
 instance Pack (EnvRef -> Term -> Result Value) where pack = native
 
