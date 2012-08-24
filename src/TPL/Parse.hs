@@ -6,13 +6,13 @@ import Text.ParserCombinators.Parsec
 import TPL.Value
                                              
 comment :: Parser ()
-comment = () <$ (try $ string "--" *> many (noneOf "\n")) <?> "comment"
+comment = () <$ (try $ string "--" *> many (noneOf "\n")) <?> ""
 
 whitespace :: Parser () 
-whitespace = skipMany (() <$ oneOf " \t" <|> comment)
+whitespace = skipMany (() <$ oneOf " \t" <|> comment) <?> ""
 
 allSpaces :: Parser ()
-allSpaces = skipMany (() <$ oneOf " \t" <|> comment <|> () <$ space)
+allSpaces = skipMany (() <$ oneOf " \t" <|> comment <|> () <$ space) <?> ""
 
 idChar :: Parser Char
 idChar = letter <|> digit <|> char '_'
@@ -62,12 +62,15 @@ object :: Parser Term
 object = char '{' *> allSpaces *> (ObjectLiteral <$> many binding) <* char '}' <* whitespace
   where binding = (,) <$> (key <* allSpaces <* char ':')
                       <*> (allSpaces *> expression <* end)
-        key = identifier <|> stringLiteral <|> num
+        key = try method <|> identifier <|> stringLiteral <|> num
+        method = Expression <$> ((:) <$> identifier <*> many1 argument)
+
+argument :: Parser Term
+argument = identifier <|> list <|> delayedExp
 
 lambda :: Parser Term
 lambda = oneOf "\\λ" *> (Lambda <$> parameters <*> body)
   where parameters = allSpaces *> many argument
-        argument = identifier <|> list <|> delayedExp
         body = string "->" *> allSpaces *> expression
         
 delayedExp :: Parser Term

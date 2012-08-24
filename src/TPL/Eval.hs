@@ -68,6 +68,7 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (ObjectLiteral bindings) = Object . EnvRef <$> newRef
           where newRef = bindings' >>= liftIO . newIORef . fromList
                 bindings' = mapM evalBinding bindings
+                evalBinding (Expression (f:args), body) = evalBinding (f, Lambda args body)
                 evalBinding (key, val) = (,) <$> toString key <*> eval env val
                 toString (Id x) = return $ String x
                 toString (StringLiteral s) = return $ String s
