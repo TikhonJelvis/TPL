@@ -18,12 +18,18 @@ precedenceOf $op := getObj (get "*precs*") (exprToString op)
 
 print x := puts (toString x)
 
+obj :> parent := (
+    setObj obj "*parent*" parent
+    obj
+)
+precedence (:>) 3
+
 _modules := []
 require f := (
     inLs e [x, xs...] := if (x = null) false (if (x = e) true (inLs e xs))
     if (inLs f _modules) null (
         fullName := TPL_PATH >< '/' >< f >< '.tpl'
-        loadObj (get "*current*") fullName
+        loadObj (get "*context*") fullName
         _modules <- f : _modules
     )
 )

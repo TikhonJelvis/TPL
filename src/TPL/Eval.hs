@@ -29,7 +29,9 @@ evalString env inp = showRes <$> runErrorT (Err.liftEither (readExpr inp) >>= ev
   where showRes (Left err)  = Err.showErrorStack err
         showRes (Right res) = displayVal res
                         
+        -- TODO: Add support for deffered parents.
 getFrom :: EnvRef -> Value -> Result Value
+getFrom env (String "*current*") = return $ Object env
 getFrom env name = do res <- getEnvRef env name <|> inherited <|> custom
                       case res of Function closure [] body -> eval closure body
                                   val                      -> return val
@@ -100,7 +102,8 @@ apply _ fn _                            = Err.throw $ Err.TypeMismatch "function
 getArgEnv :: EnvRef -> Term -> Term -> EnvRef -> Result EnvRef
 getArgEnv env (Lambda [] n) arg oldEnv = getArgEnv env n (Lambda [] arg) oldEnv
 getArgEnv env name arg oldEnv = do val <- eval env arg
-                                   bindObj (first String <$> unify name val) oldEnv
+                                   let context = (String "*context*", Object env)
+                                   bindObj (context : (first String <$> unify name val)) oldEnv
 
 applyVal :: EnvRef -> Value -> Value -> Result Value
 applyVal env (Function cl [p] body) val    = newEnv cl p val >>= (`eval` body)
