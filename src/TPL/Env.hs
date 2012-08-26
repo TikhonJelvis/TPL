@@ -28,8 +28,7 @@ bindEnv bindings env = M.union (M.fromList bindings) env
 
 getEnvRef :: EnvRef -> Value -> Result Value
 getEnvRef env (String "*current*") = return $ Object env
-getEnvRef (EnvRef ref) name        = do env <- liftIO $ readIORef ref
-                                        liftEither $ getEnv name env
+getEnvRef (EnvRef ref) name        = liftIO (readIORef ref) >>= liftEither . getEnv name
 
 setEnvRef :: EnvRef -> Value -> Value -> Result Value
 setEnvRef (EnvRef ref) name val = do env <- liftIO $ readIORef ref

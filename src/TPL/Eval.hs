@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances, OverlappingInstances, ScopedTypeVariables #-}
 module TPL.Eval where
 
-import Control.Applicative           ((<$>), (<*>))
+import Control.Applicative           ((<$>), (<*>), (<|>))
 import Control.Arrow                 (first, second)
 import Control.Monad.Error           (throwError, liftIO, runErrorT, foldM)
 
@@ -11,7 +11,7 @@ import Data.Map                      (fromList)
 
 import Text.ParserCombinators.Parsec (parse)
 
-import TPL.Env                       (getEnvRef, getPrecs, bindEnvRef, defineEnvRef, setEnvRef)
+import TPL.Env                       (getEnv, getEnvRef, getPrecs, bindEnvRef, defineEnvRef, setEnvRef)
 import qualified TPL.Error as Err 
 import TPL.Native
 import TPL.Parse                     (program)
@@ -29,51 +29,86 @@ evalString env inp = showRes <$> runErrorT (Err.liftEither (readExpr inp) >>= ev
   where showRes (Left err)  = Err.showErrorStack err
         showRes (Right res) = displayVal res
                         
+getFrom :: EnvRef -> Value -> Result Value
+getFrom env name = do res <- getEnvRef env name <|> inherited <|> custom
+                      case res of Function closure [] body -> eval closure body
+                                  val                      -> return val
+  where inherited = do parent <- getEnvRef env (String "*parent*")
+                       case parent of Object ref   -> getFrom ref name
+                                      v            -> Err.throw $ TypeMismatch "object" v
+        custom = do getter <- getEnvRef env (String "*get*") <|> Err.throw (UndefinedVariable name)
+                    case getter of f@Function{} -> applyVal env f name
+                                   v            -> Err.throw $ TypeMismatch "function" v
+
+customSet :: EnvRef -> Value -> Value -> Result Value
+customSet env name value = do setter <- getEnvRef env (String "*set*") <|> Err.throw (UndefinedVariable name)
+                              case setter of f@Function{} -> foldM (applyVal env) setter [name, value]
+                                             v            -> Err.throw $ TypeMismatch "function" v
+
+setIn :: EnvRef -> Value -> Value -> Result Value
+setIn env name value = setEnvRef env name value <|> inherited <|> customSet env name value
+  where inherited = do parent <- getEnvRef env (String "*parent*")
+                       case parent of Object ref -> setIn ref name value
+                                      v          -> Err.throw $ TypeMismatch "object" v
+
+defineIn :: EnvRef -> Value -> Value -> Result Value
+defineIn env name value = customSet env name value <|> defineEnvRef env name value
+
+bindObj :: [(Value, Value)] -> EnvRef -> Result EnvRef
+bindObj new base = makeEnvRef $ (String "*parent*", Object base) : new
+
+makeEnvRef :: [(Value, Value)] -> Result EnvRef
+makeEnvRef = fmap EnvRef . liftIO . newIORef . fromList
+
 eval :: EnvRef -> Term -> Result Value
 eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                    case res of
-                     Left err  -> throwError $ Err.pushTrace err expr 
+                     Left err  -> throwError $ Err.pushTrace err expr
                      Right r   -> return r
-  where go Operator{}          = error "eval -> go: cannot eval operator!"
+  where go Operator{}          = error "go: cannot eval operator!"
         go NullLiteral         = return Null
         go (NumericLiteral n)  = return $ Number n
         go (StringLiteral s)   = return $ String s
         go (BoolLiteral b)     = return $ Bool b
-        go name@Id{}           = do res <- getEnvRef env . String $ display name
-                                    case res of
-                                      Function closure [] body -> eval closure body
-                                      val                      -> return val
+        go name@Id{}           = getFrom env . String $ display name
         go e@Expression{}      = (`normalize` e) <$> getPrecs env >>= evalExpr
           where evalExpr (Expression [])         = return Null
                 evalExpr (Expression [term])     = eval env term
-                evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM apply fn args
+                evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM (apply env) fn args
                 evalExpr expression              = eval env expression
-
-                apply fn@(Function _ [] _) _        = Err.throw $ Err.TooManyArguments fn
-                apply (Function cl [p] body) arg    = getArgEnv p arg cl >>= (`eval` body)
-                apply (Function cl (p:ps) body) arg = do cl' <- getArgEnv p arg cl
-                                                         return $ Function cl' ps body
-                apply (Native (NativeOpr opr)) arg  = opr env arg
-                apply fn _                          = Err.throw $ Err.TypeMismatch "function" fn
-
-                getArgEnv (Lambda [] n) arg oldEnv = getArgEnv n (Lambda [] arg) oldEnv
-                getArgEnv name arg oldEnv = do val <- eval env arg
-                                               let unified = first String <$> unify name val
-                                               liftIO $ bindEnvRef unified oldEnv
-        
         go (ListLiteral terms) = List <$> mapM (eval env) terms
         go (Lambda args body)  = return $ Function env args body
         go (Block [])          = return Null
         go (Block terms)       = last <$> mapM (eval env) terms
-        go (ObjectLiteral bindings) = Object . EnvRef <$> newRef
-          where newRef = bindings' >>= liftIO . newIORef . fromList
+        go (ObjectLiteral bindings) = Object <$> newRef
+          where newRef = bindings' >>= makeEnvRef
                 bindings' = mapM evalBinding bindings
                 evalBinding (Expression (f:args), body) = evalBinding (f, Lambda args body)
-                evalBinding (key, val) = (,) <$> toString key <*> eval env val
+                evalBinding (key, val)                  = (,) <$> toString key <*> eval env val
                 toString (Id x) = return $ String x
                 toString (StringLiteral s) = return $ String s
                 toString v = Err.throw $ BadIdentifier v
 
+apply :: EnvRef -> Value -> Term -> Result Value
+apply _ fn@(Function _ [] _) _          = Err.throw $ Err.TooManyArguments fn
+apply env (Function cl [p] body) arg    = getArgEnv env p arg cl >>= (`eval` body)
+apply env (Function cl (p:ps) body) arg = do cl' <- getArgEnv env p arg cl
+                                             return $ Function cl' ps body
+apply env (Native (NativeOpr opr)) arg  = opr env arg
+apply _ fn _                            = Err.throw $ Err.TypeMismatch "function" fn
+
+getArgEnv :: EnvRef -> Term -> Term -> EnvRef -> Result EnvRef
+getArgEnv env (Lambda [] n) arg oldEnv = getArgEnv env n (Lambda [] arg) oldEnv
+getArgEnv env name arg oldEnv = do val <- eval env arg
+                                   bindObj (first String <$> unify name val) oldEnv
+
+applyVal :: EnvRef -> Value -> Value -> Result Value
+applyVal env (Function cl [p] body) val    = newEnv cl p val >>= (`eval` body)
+applyVal env (Function cl (p:ps) body) val = (\ e -> Function e ps body) <$> newEnv cl p val
+
+newEnv :: EnvRef -> Term -> Value -> Result EnvRef
+newEnv env name value = bindObj (first String <$> unify name value) env
+                 
 defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
 
@@ -103,15 +138,15 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("open",         pack readFile),
                 ("toString",     pack displayVal),
                 ("exprToString", pack exprToString),
-                (":=",           pack $ execOnId defineEnvRef),
-                ("<-",           pack $ execOnId setEnvRef),
+                (":=",           pack $ execOnId defineIn),
+                ("<-",           pack $ execOnId setIn),
                 ("#",            pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
-                ("get",          pack $ \ env term -> eval env term >>= getEnvRef env),
-                ("set",          pack $ \ env term value -> eval env term >>= flip (setEnvRef env) value),
-                ("define",       pack $ \ env term value -> eval env term >>= flip (defineEnvRef env) value),
-                ("getObj",       pack getEnvRef),
-                ("setObj",       pack setEnvRef),
-                ("defineObj",    pack defineEnvRef),
+                ("get",          pack $ \ env term -> eval env term >>= getFrom env),
+                ("set",          pack $ \ env term value -> eval env term >>= flip (setIn env) value),
+                ("define",       pack $ \ env term value -> eval env term >>= flip (defineIn env) value),
+                ("getObj",       pack getFrom),
+                ("setObj",       pack setIn),
+                ("defineObj",    pack defineIn),
                 ("loadObj",      pack $ \ env path -> liftIO (readFile path) >>= Err.liftEither . readExpr >>= eval env),
                 ("with",         pack with)]
           where eqOp :: Value -> Value -> Value
@@ -124,7 +159,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                         flattenExprs (Expression e) = e >>= flattenExprs
                         flattenExprs e              = [e]
                         exec (Id x) = eval env rval >>= fn env (String x)
-                        exec (Expression ((Id "#"):obj:(Id name):args)) =
+                        exec (Expression (Id "#":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)
                                   | null args = eval env rval >>= fn ref (String name)
@@ -135,11 +170,11 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 with (Object ref) (Function _ args body) = return $ Function ref args body
                 with Object{} f                          = Err.throw $ TypeMismatch "function" f
                 with o _                                 = Err.throw $ TypeMismatch "object" o
-                exprToString env (Id x) = getEnvRef env (String x) >>= displayDeferred
+                exprToString env (Id x) = getFrom env (String x) >>= displayDeferred
                 exprToString env term = eval env term >>= displayDeferred
                 displayDeferred (Function _ [] e) = return . String $ display e
                 displayDeferred v                 = Err.throw $ TypeMismatch "deferred expression" v
-                getObjId name (Object ref) = getEnvRef ref (String name)
+                getObjId name (Object ref) = getFrom ref (String name)
                 getObjId _ v               = Err.throw $ TypeMismatch "object" v
                 
 baseEnv :: IO EnvRef
