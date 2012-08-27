@@ -11,8 +11,9 @@
 
 (defvar tpl-mode-syntax-table
   (let ((table (make-syntax-table)))
-    (modify-syntax-entry ?' "\"'" table)
+    (modify-syntax-entry ?- ". 12b" table)
     (modify-syntax-entry ?\n "> b" table)
+    (modify-syntax-entry ?' "\"'" table)
     (modify-syntax-entry ?\" "\"'" table)
     table))
 
@@ -144,7 +145,7 @@ tpl-indent-automatically is set to t."
 
 (define-generic-mode 'tpl-mode
   ;; comment-list
-  nil
+  '("--")
   ;; keyword-list
   '("if"
     "else"
