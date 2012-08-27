@@ -10,7 +10,7 @@ define "*precs*" {
     "/=" : 3
     ":" : 4
     "*application*" : 10
-    "#" : 11
+    "." : 11
 }
 
 precedence $op n := defineObj (get "*precs*") (exprToString op) n
@@ -19,7 +19,7 @@ precedenceOf $op := getObj (get "*precs*") (exprToString op)
 print x := puts (toString x)
 
 obj :> parent := (
-    setObj obj "*parent*" parent
+    defineObj obj "*parent*" parent
     obj
 )
 precedence (:>) 3

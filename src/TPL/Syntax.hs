@@ -8,7 +8,7 @@ import Data.Maybe    (fromMaybe)
 import TPL.Value
 
 defaultPrecedence :: Int
-defaultPrecedence = 10
+defaultPrecedence = 5
 
 possiblePrecedences :: [Int]
 possiblePrecedences = [1..11]

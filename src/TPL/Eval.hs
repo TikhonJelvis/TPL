@@ -32,9 +32,7 @@ evalString env inp = showRes <$> runErrorT (Err.liftEither (readExpr inp) >>= ev
         -- TODO: Add support for deffered parents.
 getFrom :: EnvRef -> Value -> Result Value
 getFrom env (String "*current*") = return $ Object env
-getFrom env name = do res <- getEnvRef env name <|> inherited <|> custom
-                      case res of Function closure [] body -> eval closure body
-                                  val                      -> return val
+getFrom env name = getEnvRef env name <|> inherited <|> custom
   where inherited = do parent <- getEnvRef env (String "*parent*")
                        case parent of Object ref   -> getFrom ref name
                                       v            -> Err.throw $ TypeMismatch "object" v
@@ -72,7 +70,9 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (NumericLiteral n)  = return $ Number n
         go (StringLiteral s)   = return $ String s
         go (BoolLiteral b)     = return $ Bool b
-        go name@Id{}           = getFrom env . String $ display name
+        go name@Id{}           = do res <- getFrom env . String $ display name
+                                    case res of Function closure [] body -> eval closure body
+                                                val                      -> return val
         go e@Expression{}      = (`normalize` e) <$> getPrecs env >>= evalExpr
           where evalExpr (Expression [])         = return Null
                 evalExpr (Expression [term])     = eval env term
@@ -143,7 +143,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("exprToString", pack exprToString),
                 (":=",           pack $ execOnId defineIn),
                 ("<-",           pack $ execOnId setIn),
-                ("#",            pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
+                (".",            pack $ \ obj env (Id x) -> eval env obj >>= getObjId x),
                 ("get",          pack $ \ env term -> eval env term >>= getFrom env),
                 ("set",          pack $ \ env term value -> eval env term >>= flip (setIn env) value),
                 ("define",       pack $ \ env term value -> eval env term >>= flip (defineIn env) value),
@@ -162,7 +162,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                         flattenExprs (Expression e) = e >>= flattenExprs
                         flattenExprs e              = [e]
                         exec (Id x) = eval env rval >>= fn env (String x)
-                        exec (Expression (Id "#":obj:Id name:args)) =
+                        exec (Expression (Id ".":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)
                                   | null args = eval env rval >>= fn ref (String name)
