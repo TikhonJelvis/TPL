@@ -24,21 +24,28 @@ obj :> parent := (
 )
 precedence (:>) 3
 
+if cond $res $else $alt := _if cond res alt
+
 _modules := []
 require f := (
-    inLs e [x, xs...] := if (x = null) false (if (x = e) true (inLs e xs))
-    if (inLs f _modules) null (
+    inLs e [x, xs...] := if (x = null) false else (if (x = e) true else (inLs e xs))
+    if (inLs f _modules) null else (
+        _modules <- f : _modules
         fullName := TPL_PATH >< '/' >< f >< '.tpl'
         loadObj (get "*context*") fullName
-        _modules <- f : _modules
     )
 )
 
-let $bindings $body := with bindings body
+force x := x
 
-require 'base/control'
-require 'base/list'
-require 'base/function'
-require 'base/logic'
-require 'base/math'
-require 'base/string'
+let bindings $body := (
+    bindings :> get "*context*"
+    force (with bindings body)
+)
+
+-- require 'base/control'
+-- require 'base/list'
+-- require 'base/function'
+-- require 'base/logic'
+-- require 'base/math'
+-- require 'base/string'

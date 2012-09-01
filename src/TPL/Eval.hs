@@ -19,13 +19,13 @@ import TPL.Pattern                   (unify)
 import TPL.Syntax                    (normalize, squash)
 import TPL.Value as Err
 
-readExpr :: String -> Either Err.Error Term
-readExpr expr = case parse program "TPL" expr of
+readExpr :: FilePath -> String -> Either Err.Error Term
+readExpr source expr = case parse program source expr of
   Left err  -> Left . Err.Error [] $ Err.Parser err
   Right val -> Right val
   
-evalString :: EnvRef -> String -> IO String
-evalString env inp = showRes <$> runErrorT (Err.liftEither (readExpr inp) >>= eval env)
+evalString :: FilePath -> EnvRef -> String -> IO String
+evalString source env inp = showRes <$> runErrorT (Err.liftEither (readExpr source inp) >>= eval env)
   where showRes (Left err)  = Err.showErrorStack err
         showRes (Right res) = displayVal res
                         
@@ -136,7 +136,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("><",           pack ((++) :: String -> String -> String)),
                 ("substr",       pack $ \ s i j -> drop i $ take j (s :: String)),
                 ("typeof",       pack showType),
-                ("if",           pack if'), 
+                ("_if",           pack if'), 
                 ("puts",         pack putStrLn),
                 ("open",         pack readFile),
                 ("toString",     pack displayVal),
@@ -150,7 +150,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("getObj",       pack getFrom),
                 ("setObj",       pack setIn),
                 ("defineObj",    pack defineIn),
-                ("loadObj",      pack $ \ env path -> liftIO (readFile path) >>= Err.liftEither . readExpr >>= eval env),
+                ("loadObj",      pack $ \ env path -> liftIO (readFile path) >>= Err.liftEither . readExpr path >>= eval env),
                 ("with",         pack with)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
@@ -162,6 +162,11 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                         flattenExprs (Expression e) = e >>= flattenExprs
                         flattenExprs e              = [e]
                         exec (Id x) = eval env rval >>= fn env (String x)
+                        exec names@ListLiteral{} =
+                          do v <- eval env rval
+                             let bs = first String <$> unify names v
+                             mapM_ (uncurry $ fn env) bs
+                             return v
                         exec (Expression (Id ".":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)
@@ -170,9 +175,11 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                                 go v            = Err.throw $ TypeMismatch "object" v
                         exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
                         exec v                              = Err.throw $ BadIdentifier v
-                with (Object ref) (Function _ args body) = return $ Function ref args body
-                with Object{} f                          = Err.throw $ TypeMismatch "function" f
-                with o _                                 = Err.throw $ TypeMismatch "object" o
+                with ref env (Id x) = getEnvRef env (String x) >>= with' ref
+                with ref env expr   = eval env expr >>= with' ref
+                with' (Object ref) (Function _ args body) = return $ Function ref args body
+                with' Object{} f                          = Err.throw $ TypeMismatch "function" f
+                with' o _                                 = Err.throw $ TypeMismatch "object" o
                 exprToString env (Id x) = getFrom env (String x) >>= displayDeferred
                 exprToString env term = eval env term >>= displayDeferred
                 displayDeferred (Function _ [] e) = return . String $ display e

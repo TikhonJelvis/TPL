@@ -11,7 +11,7 @@ readPrompt :: String -> IO String
 readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
 
 evalAndPrint :: EnvRef -> String -> IO ()
-evalAndPrint env expr = evalString env expr >>= putStrLn
+evalAndPrint env expr = evalString "<repl>" env expr >>= putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
 until_ predicate prompt action = 
@@ -23,14 +23,15 @@ until_ predicate prompt action =
 prelude :: IO EnvRef
 prelude = do env <- baseEnv
              path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
-             _    <- evalString env $ "TPL_PATH := '" ++ path ++ "'"
-             _    <- evalString env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"   
+             _    <- evalString "<prelude>" env $ "TPL_PATH := '" ++ path ++ "'"
+             _    <- evalString "<prelude>" env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"   
              return $ env
 
 repl :: IO () 
 repl = do env  <- prelude
-          until_ ((== "--quit") . dropWhile (/= '-')) (readPrompt "λ>") $ evalAndPrint env
+          until_ (== ":quit") (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
-runFile path = do code <- readFile path
-                  prelude >>= (`evalString` code) >>= putStrLn
+runFile path = do code  <- readFile path
+                  start <- prelude
+                  evalString path start code >>= putStrLn

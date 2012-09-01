@@ -56,7 +56,7 @@ operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
         
 list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
-  where contents = expression `sepBy` (char ',' <* allSpaces)
+  where contents = (expression <* allSpaces) `sepBy` (char ',' <* allSpaces)
 
 object :: Parser Term
 object = char '{' *> allSpaces *> (ObjectLiteral <$> many binding) <* char '}' <* whitespace
