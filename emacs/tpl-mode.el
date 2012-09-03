@@ -167,7 +167,7 @@ tpl-indent-automatically is set to t."
   ;; font-lock-list
   '(("\\b\\([0-9]+\\|null\\|true\\|false\\)\\b" . font-lock-constant-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)[ \t]*:=" 1 'font-lock-function-name-face)
-    ("^[ \t]*\\([_a-zA-Z0-9]+\\)\\([ \t]+\\([_a-zA-Z0-9]+\\|\\[.*\\]\\)\\)+[ \t]*:=" 1 'font-lock-function-name-face)
+    ("^[ \t]*\\([_a-zA-Z0-9]+\\)\\([ \t]+\\($?[_a-zA-Z0-9]+\\|$?\\[.*\\]\\)\\)+[ \t]*:=" 1 'font-lock-function-name-face)
     ("\\([-+=*&^%#@!?/.|~<>:]+\\)" 1 'font-lock-type-face))
   ;; auto-mode-alist
   '(".tpl\\'")
