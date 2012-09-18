@@ -7,12 +7,14 @@ import           Control.Applicative ((<$>))
 import           Control.Arrow       (first, second)
 import           Control.Monad.Error (liftIO)
 
-import           TPL.Env
-import           TPL.Error
-import           TPL.Eval
-import           TPL.Pack
-import           TPL.Pattern
-import           TPL.Value
+import           TPL.Env             (bindEnvRef, getEnvRef)
+import           TPL.Error           (liftEither, throw)
+import           TPL.Eval            (defineIn, eval, getFrom, readExpr, setIn)
+import           TPL.Pack            (Extract, Pack, extract, native, pack)
+import           TPL.Pattern         (unify)
+import           TPL.Value           (EnvRef, ErrorType (..), Result, Term (..),
+                                      Value (..), display, displayVal, nullEnv,
+                                      showType)
 
                  -- Native functions:
 instance (Extract a, Pack b) => Pack (a -> Result b) where
