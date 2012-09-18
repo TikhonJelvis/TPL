@@ -1,14 +1,17 @@
 module TPL.Parse where
 
-import Control.Applicative           ((<$>), (<$), (<*), (*>), (<*>))
-import Text.ParserCombinators.Parsec
+import           Control.Applicative           ((*>), (<$), (<$>), (<*), (<*>))
 
-import TPL.Value
-                                             
+import           Data.Char                     (isSymbol)
+
+import           Text.ParserCombinators.Parsec
+
+import           TPL.Value
+
 comment :: Parser ()
 comment = () <$ (try $ string "--" *> many (noneOf "\n")) <?> ""
 
-whitespace :: Parser () 
+whitespace :: Parser ()
 whitespace = skipMany (() <$ oneOf " \t" <|> comment) <?> ""
 
 allSpaces :: Parser ()
@@ -19,14 +22,14 @@ idChar = letter <|> digit <|> char '_'
 
 idStartChar :: Parser Char
 idStartChar = letter <|> char '_'
-          
+
 keyword :: String -> Parser String
 keyword str = try (string str) <* notFollowedBy idChar <* whitespace <?> str
 
 stringLiteral :: Parser Term
 stringLiteral = StringLiteral <$> (strLit '\'' <|> strLit '"') <* whitespace <?> "string"
   where strLit quote = char quote *> contents quote <* char quote
-        contents quote = many $ (char '\\' *> specChar) <|> noneOf [quote] 
+        contents quote = many $ (char '\\' *> specChar) <|> noneOf [quote]
         specChar = spec <$> escapeCharacter
         escapeCharacter = oneOf "\"\\nt'" <?> "valid escape character (\", n, t, \\, or ')"
         spec character = case character of
@@ -51,9 +54,8 @@ identifier = Id <$> name <* whitespace <?> "identifier"
 
 operator :: Parser Term
 operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
-  where opChars = "+-=*&^%#@!?/.|~<>:" -- TODO: Systematically identify valid opChars...
-        op = many1 $ oneOf opChars
-        
+  where op = many1 $ satisfy isSymbol
+
 list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
   where contents = (expression <* allSpaces) `sepBy` (char ',' <* allSpaces)
@@ -71,16 +73,16 @@ argument = identifier <|> list <|> delayedExp
 lambda :: Parser Term
 lambda = oneOf "\\λ" *> (Lambda <$> parameters <*> body)
   where parameters = allSpaces *> many argument
-        body = string "->" *> allSpaces *> expression
-        
+        body = (string "->" <|> string "→") *> allSpaces *> expression
+
 delayedExp :: Parser Term
-delayedExp = char '$' *> allSpaces *> (Lambda [] <$> atom) 
+delayedExp = char '$' *> allSpaces *> (Lambda [] <$> atom)
 
 block :: Parser Term
 block = between (char '(' *> allSpaces) (char ')' *> whitespace) expressions
 
 expression :: Parser Term
-expression = Expression <$> many1 atom <?> "expression" 
+expression = Expression <$> many1 atom <?> "expression"
 
 atom :: Parser Term
 atom =  lambda
@@ -94,7 +96,7 @@ atom =  lambda
     <|> object
     <|> delayedExp
     <|> block
-    
+
 expressions :: Parser Term
 expressions = allSpaces *> (Block <$> many (expression <* end))
 
