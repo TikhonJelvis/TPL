@@ -147,23 +147,25 @@ tpl-indent-automatically is set to t."
   ;; comment-list
   '("--")
   ;; keyword-list
-  '("if"
-    "else"
-    "cond"
-    "switch"
-    "for"
-    "in"
-    "while"
-    "do"
-    "with"
-    "let"
+  '("cond"
     "define"
-    "set"
+    "do"
+    "else"
+    "for"
     "get"
+    "if"
+    "in"
+    "let"
+    "load"
     "precedence"
     "precedenceOf"
-    "load"
-    "require")
+    "require"
+    "set"
+    "switch"
+    "typeof"
+    "typecase"
+    "while"
+    "with")
   ;; font-lock-list
   '(("\\b\\([0-9]+\\|null\\|true\\|false\\)\\b" . font-lock-constant-face)
     ("^[ \t]*\\([_a-zA-Z0-9]+\\)[ \t]*:=" 1 'font-lock-function-name-face)
