@@ -1,11 +1,12 @@
 module TPL.Run (repl, runFile) where
- 
-import System.Directory   (getCurrentDirectory)
-import System.Environment (getEnv)
-import System.IO
 
-import TPL.Eval           (baseEnv, evalString)
-import TPL.Value
+import           System.Directory   (getCurrentDirectory)
+import           System.Environment (getEnv)
+import           System.IO
+
+import           TPL.Eval           (evalString)
+import           TPL.Native         (baseEnv)
+import           TPL.Value
 
 readPrompt :: String -> IO String
 readPrompt prompt = putStr prompt >> hFlush stdout >> getLine
@@ -14,9 +15,9 @@ evalAndPrint :: EnvRef -> String -> IO ()
 evalAndPrint env expr = evalString "<repl>" env expr >>= putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
-until_ predicate prompt action = 
+until_ predicate prompt action =
   do result <- prompt
-     if predicate result 
+     if predicate result
        then return ()
        else action result >> until_ predicate prompt action
 
@@ -24,10 +25,10 @@ prelude :: IO EnvRef
 prelude = do env <- baseEnv
              path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
              _    <- evalString "<prelude>" env $ "TPL_PATH := '" ++ path ++ "'"
-             _    <- evalString "<prelude>" env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"   
+             _    <- evalString "<prelude>" env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
              return $ env
 
-repl :: IO () 
+repl :: IO ()
 repl = do env  <- prelude
           until_ (== ":quit") (readPrompt "λ>") $ evalAndPrint env
 

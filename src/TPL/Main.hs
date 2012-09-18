@@ -2,13 +2,15 @@ module Main where
 
 import System.Environment
 
+import Text.Printf        (printf)
+
 import TPL.Run
 
 version :: String
 version = "0.4.0"
 
 welcome :: String
-welcome = "Welcome to TPL version " ++ version ++ "\nType \"--quit\" to quit."
+welcome = printf "Welcome to TPL version %s\nType \"--quit\" to quit." version
 
 main :: IO ()
 main = getArgs >>= go

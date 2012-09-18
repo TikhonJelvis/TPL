@@ -1,14 +1,15 @@
 module TPL.Env where
 
-import Control.Applicative ((<*>), (<$>), (<$), (<|>))
-import Control.Monad.Error (throwError, liftIO)
+import           Control.Applicative ((<$), (<$>), (<*>), (<|>))
+import           Control.Monad.Error (liftIO, throwError)
 
-import Data.IORef          (readIORef, writeIORef, modifyIORef, newIORef)
-import qualified Data.Map as M
+import           Data.IORef          (modifyIORef, newIORef, readIORef,
+                                      writeIORef)
+import qualified Data.Map            as M
 
-import TPL.Error
-import TPL.Native
-import TPL.Value
+import           TPL.Error
+import           TPL.Pack
+import           TPL.Value
 
 und :: Value -> Error
 und = Error [] . UndefinedVariable
@@ -19,10 +20,10 @@ getEnv name env = maybe (Left $ und name) Right $ M.lookup name env
 setEnv :: Value -> Value -> Env -> Either Error Env
 setEnv name val env = maybe (Left $ und name) (const newEnv) $ M.lookup name env
   where newEnv = Right $ M.insert name val env
-        
+
 defineEnv :: Value -> Value -> Env -> Env
 defineEnv name val env = M.insert name val env
-        
+
 bindEnv :: [(Value, Value)] -> Env -> Env
 bindEnv bindings env = M.union (M.fromList bindings) env
 
@@ -34,7 +35,7 @@ setEnvRef (EnvRef ref) name val = do env <- liftIO $ readIORef ref
                                      case setEnv name val env of
                                        Left err   -> throwError err
                                        Right env' -> val <$ liftIO (writeIORef ref env')
-                                       
+
 defineEnvRef :: EnvRef -> Value -> Value -> Result Value
 defineEnvRef (EnvRef ref) name val = liftIO $ val <$ (modifyIORef ref $ defineEnv name val)
 
