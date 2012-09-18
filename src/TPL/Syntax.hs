@@ -1,58 +1,38 @@
 module TPL.Syntax where
 
-import Data.Function (on)
-import Data.Functor  ((<$>)) 
-import Data.List     (groupBy)
-import Data.Maybe    (fromMaybe)
+import           Data.Function (on)
+import           Data.Functor  ((<$>))
+import           Data.List     (groupBy)
+import           Data.Maybe    (fromMaybe)
 
-import TPL.Value
+import           TPL.Value
 
-defaultPrecedence :: Int
-defaultPrecedence = 5
+-- TODO: Support left/right associative operators?
+--       I currently only have left associative operators. But meh?
+processOp :: String -> Term -> Term
+processOp op = squash . desugar . deleteApps . handleOp . reifyApps
+  where handleOp e@(Expression expr)
+          | Operator op `elem` expr = Expression $ squash <$> [Id op, Expression left, Expression right]
+          | otherwise               = e
+          where right = reverse . takeWhile (/= Operator op) $ reverse expr
+                left = reverse . drop 1 . dropWhile (/= Operator op) $ reverse expr
 
-possiblePrecedences :: [Int]
-possiblePrecedences = [1..11]
-
-normalize :: [(String, Int)] -> Term -> Term -- Take care of operator precedence and sections
-normalize precs = unReifyApps . desugar . handleInfix . reifyApps
-  where handleInfix (Expression expr) = squash . Expression $ foldl1 (.) handleAll expr'
-          where expr' = squash . Expression <$> groupBy ((==) `on` isOp) expr
-                handleAll = handle <$> possiblePrecedences
-                handle prec (left : op@Operator{} : right : more) = handleOp (getPrec op)
-                  where handleOp actualPrec
-                          | actualPrec == prec = handle prec $ Expression [left, op, right] : more
-                          | otherwise         = left : handle prec (op:right:more)
-                handle prec (left:more) = left : handle prec more
-                handle _ val            = val
-        handleInfix val = val
-        
         app = "*application*"
+        notApp (Id x)       = x /= app
+        notApp (Operator o) = o /= app
+        notApp _            = True
         reifyApps (Expression ls) = Expression $ go ls
-          where go (a:b:rest) | not $ isOp b || isOp a = a : Operator app : go (b:rest)
-                              | otherwise           = a : go (b:rest)
+          where go (a:b:rest) | not $ isOp b || isOp a = a : Operator app : go (b : rest)
+                              | otherwise           = a : go (b : rest)
                 go a                                = a
         reifyApps x               = x
-        unReifyApps (Expression [op, a, b]) | op == Id app = Expression [a, b]
-                                            | otherwise   = Expression [op, a, b]
-        unReifyApps x                                     = x
+        deleteApps (Expression expr) = Expression $ deleteApps <$> filter notApp expr
+        deleteApps x                 = x
 
-        getPrec (Operator str) = fromMaybe defaultPrecedence $ lookup str precs
-        getPrec _              = defaultPrecedence
-
-        desugar (Expression [op@Operator{}, right]) = section [sId, op, right]
-        desugar (Expression [left, op@Operator{}])  = section [left, op, sId]
-        desugar (Expression [a, Operator op, b])    = desugar $ Expression [Id op, a, b]
-        desugar (Expression expr)                   = Expression $ normalize precs <$>  expr
-        desugar (ListLiteral items)                 = ListLiteral $ normalize precs <$> items
-        desugar (Block terms)                       = Block $ normalize precs <$> terms
-        desugar (Operator op)                       = Id op
-        desugar val                                 = val
-
-sId :: Term                      -- The id used for operator section arguments
-sId = Id "*α"
-
-section :: [Term] -> Term
-section = Lambda [sId] . Expression
+        desugar (Expression [Operator op, right]) = Lambda [Id "α"] $ Expression [Id op, Id "α", right]
+        desugar (Expression [left, Operator op])  = Expression [Id op, left]
+        desugar (Operator op)                     = Id op
+        desugar val                               = val
 
 isOp :: Term -> Bool
 isOp Operator{} = True
