@@ -1,14 +1,11 @@
 module TPL.Syntax where
 
-import           Data.Function (on)
-import           Data.Functor  ((<$>))
-import           Data.List     (groupBy)
-import           Data.Maybe    (fromMaybe)
+import           Data.Functor ((<$>))
 
 import           TPL.Value
 
 -- TODO: Support left/right associative operators?
---       I currently only have left associative operators. But meh?
+--       I currently only have left associative operators.
 processOp :: String -> Term -> Term
 processOp op = squash . desugar . deleteApps . handleOp . reifyApps
   where handleOp e@(Expression expr)
@@ -16,6 +13,7 @@ processOp op = squash . desugar . deleteApps . handleOp . reifyApps
           | otherwise               = e
           where right = reverse . takeWhile (/= Operator op) $ reverse expr
                 left = reverse . drop 1 . dropWhile (/= Operator op) $ reverse expr
+        handleOp notExpression = notExpression
 
         app = "*application*"
         notApp (Id x)       = x /= app
@@ -29,9 +27,9 @@ processOp op = squash . desugar . deleteApps . handleOp . reifyApps
         deleteApps (Expression expr) = Expression $ deleteApps <$> filter notApp expr
         deleteApps x                 = x
 
-        desugar (Expression [Operator op, right]) = Lambda [Id "α"] $ Expression [Id op, Id "α", right]
-        desugar (Expression [left, Operator op])  = Expression [Id op, left]
-        desugar (Operator op)                     = Id op
+        desugar (Expression [Operator o, right])  = Lambda [Id "α"] $ Expression [Id o, Id "α", right]
+        desugar (Expression [left, Operator o])   = Expression [Id o, left]
+        desugar (Operator o)                      = Id o
         desugar val                               = val
 
 isOp :: Term -> Bool
