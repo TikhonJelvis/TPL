@@ -2,7 +2,7 @@ module TPL.Parse where
 
 import           Control.Applicative           ((*>), (<$), (<$>), (<*), (<*>))
 
-import           Data.Char                     (isSymbol)
+import           Data.Char                     (isPunctuation, isSymbol)
 
 import           Text.ParserCombinators.Parsec
 
@@ -54,7 +54,8 @@ identifier = Id <$> name <* whitespace <?> "identifier"
 
 operator :: Parser Term
 operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
-  where op = many1 $ satisfy isSymbol
+  where op = many1 $ satisfy operatorSymbol
+        operatorSymbol x = (isSymbol x || isPunctuation x) && (not $ x `elem` "$[]{}(),;`")
 
 list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
