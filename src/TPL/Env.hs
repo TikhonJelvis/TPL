@@ -1,6 +1,6 @@
 module TPL.Env where
 
-import           Control.Applicative ((<$), (<$>), (<*>), (<|>))
+import           Control.Applicative ((<$), (<$>))
 import           Control.Monad.Error (liftIO, throwError)
 
 import           Data.IORef          (modifyIORef, newIORef, readIORef,
@@ -8,7 +8,6 @@ import           Data.IORef          (modifyIORef, newIORef, readIORef,
 import qualified Data.Map            as M
 
 import           TPL.Error
-import           TPL.Pack
 import           TPL.Value
 
 und :: Value -> Error
@@ -41,9 +40,3 @@ defineEnvRef (EnvRef ref) name val = liftIO $ val <$ (modifyIORef ref $ defineEn
 
 bindEnvRef :: [(Value, Value)] -> EnvRef -> IO EnvRef
 bindEnvRef bindings (EnvRef ref) = bindEnv bindings <$> readIORef ref >>= (EnvRef <$>) . newIORef
-
-getPrecs :: EnvRef -> Result [(String, Int)]
-getPrecs env = obj <|> return []
-  where obj = do Object (EnvRef ref) <- getEnvRef env $ String "*precs*"
-                 M.toList <$> liftIO (readIORef ref) >>= mapM extractTup
-        extractTup (v1, v2) = (,) <$> extract v1 <*> extract v2

@@ -1,11 +1,13 @@
 module TPL.Run (repl, runFile) where
 
-import           System.Directory   (getCurrentDirectory)
-import           System.Environment (getEnv)
+import           Control.Monad.Error (runErrorT)
+
+import           System.Directory    (getCurrentDirectory)
+import           System.Environment  (getEnv)
 import           System.IO
 
-import           TPL.Eval           (evalString)
-import           TPL.Native         (baseEnv)
+import           TPL.Eval            (defineIn, evalString)
+import           TPL.Native          (baseEnv)
 import           TPL.Value
 
 readPrompt :: String -> IO String
@@ -24,13 +26,13 @@ until_ predicate prompt action =
 prelude :: IO EnvRef
 prelude = do env <- baseEnv
              path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
-             _    <- evalString "<prelude>" env $ "TPL_PATH := '" ++ path ++ "'"
+             _    <- runErrorT $ defineIn env (String "TPL_PATH") $ String path
              _    <- evalString "<prelude>" env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
              return $ env
 
 repl :: IO ()
 repl = do env  <- prelude
-          until_ (== ":quit") (readPrompt "λ>") $ evalAndPrint env
+          until_ (== "--quit") (readPrompt "λ>") $ evalAndPrint env
 
 runFile :: FilePath -> IO ()
 runFile path = do code  <- readFile path

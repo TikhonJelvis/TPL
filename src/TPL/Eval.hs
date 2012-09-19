@@ -1,24 +1,23 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module TPL.Eval where
 
 import           Control.Applicative           ((<$>), (<*>), (<|>))
-import           Control.Arrow                 (first, second)
+import           Control.Arrow                 (first)
 import           Control.Monad.Error           (foldM, liftIO, runErrorT,
                                                 throwError)
 
 import           Data.IORef                    (newIORef)
+import           Data.List                     (minimumBy)
 import           Data.Map                      (fromList)
+import           Data.Ord                      (comparing)
 
 import           Text.ParserCombinators.Parsec (parse)
 
-import           TPL.Env                       (bindEnvRef, defineEnvRef,
-                                                getEnv, getEnvRef, getPrecs,
+import           TPL.Env                       (defineEnvRef, getEnvRef,
                                                 setEnvRef)
 import qualified TPL.Error                     as Err
-import           TPL.Pack
 import           TPL.Parse                     (program)
 import           TPL.Pattern                   (unify)
-import           TPL.Syntax                    (processOp, squash)
+import           TPL.Syntax                    (isOp, processOp, squash)
 import           TPL.Value                     as Err
 
 readExpr :: FilePath -> String -> Either Err.Error Term
@@ -39,13 +38,13 @@ getFrom env name = getEnvRef env name <|> inherited <|> custom
                        case parent of Object ref   -> getFrom ref name
                                       v            -> Err.throw $ TypeMismatch "object" v
         custom = do getter <- getEnvRef env (String "*get*") <|> Err.throw (UndefinedVariable name)
-                    case getter of f@Function{} -> applyVal env f name
+                    case getter of f@Function{} -> applyVal f name
                                    v            -> Err.throw $ TypeMismatch "function" v
 
 customSet :: EnvRef -> Value -> Value -> Result Value
 customSet env name value = do setter <- getEnvRef env (String "*set*") <|> Err.throw (UndefinedVariable name)
-                              case setter of f@Function{} -> foldM (applyVal env) setter [name, value]
-                                             v            -> Err.throw $ TypeMismatch "function" v
+                              case setter of Function{} -> foldM applyVal setter [name, value]
+                                             v          -> Err.throw $ TypeMismatch "function" v
 
 setIn :: EnvRef -> Value -> Value -> Result Value
 setIn env name value = setEnvRef env name value <|> inherited <|> customSet env name value
@@ -75,8 +74,19 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go name@Id{}           = do res <- getFrom env . String $ display name
                                     case res of Function closure [] body -> eval closure body
                                                 val                      -> return val
-        go e@(Expression expr) = undefined -- processOp "+" >>= evalExpr
-          where evalExpr (Expression [])         = return Null
+        go e@(Expression body) = do precs <- mapM getPrec $ operators body
+                                    case zip precs $ operators body of
+                                      [] -> evalExpr e
+                                      ls -> let op = snd $ minimumBy (comparing fst) ls in
+                                        evalExpr $ processOp op e
+          where operators = map (\ (Operator o) -> o) . filter isOp
+                getPrec s = do val <- getFrom env (String "*precs*") >>= extract >>= (`getFrom` String s)
+                               case val of Number n -> return n
+                                           v        -> Err.throw $ TypeMismatch "number" v
+                extract (Object ref) = return ref
+                extract v            = Err.throw $ TypeMismatch "object" v
+
+                evalExpr (Expression [])         = return Null
                 evalExpr (Expression [term])     = eval env term
                 evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM (apply env) fn args
                 evalExpr expression              = eval env expression
@@ -107,9 +117,10 @@ getArgEnv env name arg oldEnv = do val <- eval env arg
                                    let context = (String "*context*", Object env)
                                    bindObj (context : (first String <$> unify name val)) oldEnv
 
-applyVal :: EnvRef -> Value -> Value -> Result Value
-applyVal env (Function cl [p] body) val    = newEnv cl p val >>= (`eval` body)
-applyVal env (Function cl (p:ps) body) val = (\ e -> Function e ps body) <$> newEnv cl p val
+applyVal :: Value -> Value -> Result Value
+applyVal (Function cl [p] body) val    = newEnv cl p val >>= (`eval` body)
+applyVal (Function cl (p:ps) body) val = (\ e -> Function e ps body) <$> newEnv cl p val
+applyVal fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
 newEnv :: EnvRef -> Term -> Value -> Result EnvRef
 newEnv env name value = bindObj (first String <$> unify name value) env

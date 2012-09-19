@@ -55,7 +55,7 @@ identifier = Id <$> name <* whitespace <?> "identifier"
 operator :: Parser Term
 operator = Operator <$> (op <|> char '`' *> name <* char '`') <* whitespace
   where op = many1 $ satisfy operatorSymbol
-        operatorSymbol x = (isSymbol x || isPunctuation x) && (not $ x `elem` "$[]{}(),;`")
+        operatorSymbol x = (isSymbol x || isPunctuation x) && (not $ x `elem` "$[]{}(),;`_")
 
 list :: Parser Term
 list = ListLiteral <$> between (char '[' *> allSpaces) (char ']' *> whitespace) contents
