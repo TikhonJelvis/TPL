@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
@@ -35,6 +36,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
         rest = [("=",            pack eqOp),
                 (":",            pack ((:) :: Value -> [Value] -> [Value])),
                 ("><",           pack ((++) :: String -> String -> String)),
+                ("strlen",       pack $ \ s -> length (s :: String)),
                 ("substr",       pack $ \ s i j -> drop i $ take j (s :: String)),
                 ("typeof",       pack showType),
                 ("_if",           pack if'),
