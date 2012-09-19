@@ -13,6 +13,7 @@ import           TPL.Error           (liftEither, throw)
 import           TPL.Eval            (defineIn, eval, getFrom, readExpr, setIn)
 import           TPL.Pack            (Extract, Pack, extract, native, pack)
 import           TPL.Pattern         (unify)
+import           TPL.Syntax          (desugar)
 import           TPL.Value           (EnvRef, ErrorType (..), Result, Term (..),
                                       Value (..), display, displayVal, nullEnv,
                                       showType)
@@ -59,7 +60,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 eqOp a b = pack $ a == b
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = throw $ TypeMismatch "boolean" v
-                execOnId fn env inp rval = exec $ simplify inp
+                execOnId fn env inp rval = exec . simplify $ desugar inp
                   where simplify (Expression terms) = Expression $ terms >>= flattenExprs
                         simplify x                  = x
                         flattenExprs (Expression e) = e >>= flattenExprs
@@ -71,6 +72,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                              mapM_ (uncurry $ fn env) bs
                              return v
                         exec (Expression [a, Operator op, b]) = exec $ Expression [Id op, a, b]
+                        exec (Expression (Operator op : rest)) = exec . Expression $ Id op : rest
                         exec (Expression (Id ".":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)
