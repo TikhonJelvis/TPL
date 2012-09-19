@@ -70,6 +70,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                              let bs = first String <$> unify names v
                              mapM_ (uncurry $ fn env) bs
                              return v
+                        exec (Expression [a, Operator op, b]) = exec $ Expression [Id op, a, b]
                         exec (Expression (Id ".":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)

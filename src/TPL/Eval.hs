@@ -61,6 +61,20 @@ bindObj new base = makeEnvRef $ (String "*parent*", Object base) : new
 makeEnvRef :: [(Value, Value)] -> Result EnvRef
 makeEnvRef = fmap EnvRef . liftIO . newIORef . fromList
 
+processOperators :: EnvRef -> Term -> Result Term
+processOperators env expr@(Expression body) =
+  do precs <- mapM getPrec $ operators body
+     return $ case zip precs $ operators body of
+       [] ->  expr
+       ls -> processOp (snd $ minimumBy (comparing fst) ls) expr
+  where operators = map (\ (Operator o) -> o) . filter isOp
+        getPrec s = do val <- getFrom env (String "*precs*") >>= extract >>= (`getFrom` String s)
+                       case val of Number n -> return n
+                                   v        -> Err.throw $ TypeMismatch "number" v
+        extract (Object ref) = return ref
+        extract v            = Err.throw $ TypeMismatch "object" v
+processOperators _ term = return term
+
 eval :: EnvRef -> Term -> Result Value
 eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                    case res of
@@ -74,19 +88,8 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go name@Id{}           = do res <- getFrom env . String $ display name
                                     case res of Function closure [] body -> eval closure body
                                                 val                      -> return val
-        go e@(Expression body) = do precs <- mapM getPrec $ operators body
-                                    case zip precs $ operators body of
-                                      [] -> evalExpr e
-                                      ls -> let op = snd $ minimumBy (comparing fst) ls in
-                                        evalExpr $ processOp op e
-          where operators = map (\ (Operator o) -> o) . filter isOp
-                getPrec s = do val <- getFrom env (String "*precs*") >>= extract >>= (`getFrom` String s)
-                               case val of Number n -> return n
-                                           v        -> Err.throw $ TypeMismatch "number" v
-                extract (Object ref) = return ref
-                extract v            = Err.throw $ TypeMismatch "object" v
-
-                evalExpr (Expression [])         = return Null
+        go e@Expression{} = processOperators env e >>= evalExpr
+          where evalExpr (Expression [])         = return Null
                 evalExpr (Expression [term])     = eval env term
                 evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM (apply env) fn args
                 evalExpr expression              = eval env expression
