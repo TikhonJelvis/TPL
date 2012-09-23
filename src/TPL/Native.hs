@@ -40,7 +40,7 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("strlen",       pack $ \ s -> length (s :: String)),
                 ("substr",       pack $ \ s i j -> drop i $ take j (s :: String)),
                 ("typeof",       pack showType),
-                ("_if",           pack if'),
+                ("_if",          pack if'),
                 ("puts",         pack putStrLn),
                 ("open",         pack readFile),
                 ("toString",     pack displayVal),
