@@ -62,7 +62,7 @@ Executable tpl
   -- Build-tools:         
   
 Test-Suite test-tpl
-  Build-depends:       base, parsec >= 3, QuickCheck, tpl
+  Build-depends:       base, parsec >= 3, QuickCheck, tpl, silently, directory
   Type:                exitcode-stdio-1.0
   Hs-source-dirs:      test
   Main-is:             test.hs
