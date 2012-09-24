@@ -1,13 +1,13 @@
 module Main where
 
-import System.Environment
+import           System.Environment
 
-import Text.Printf        (printf)
+import           Text.Printf        (printf)
 
-import TPL.Run
+import           TPL.Run
 
 version :: String
-version = "0.4.0"
+version = "0.5.0"
 
 welcome :: String
 welcome = printf "Welcome to TPL version %s\nType \"--quit\" to quit." version
