@@ -1,29 +1,33 @@
-require 'base/function'
 require 'base/list'
 
-condition => $result := if condition result else false
-precedence (=>) 2
+condition ==> $result := if condition result else false
+precedence (==>) 4
+
+pred ? $then := \ $alt -> if pred then else alt
+precedence (?) 3
+
 else := true
 
-condition ? $consequent := if condition (\ $x -> consequent) else (\ $x -> x)
-precedence (?) 4
+$a => $b := [$a, $b]
+precedence (=>) 1
+switch value [[condition, res], rest...] := value = condition ? res # is rest ==> switch value rest
+cond [[condition, res], rest...] := is condition ==> (condition ? res # cond rest)
 
-$a -> $b := [$a, $b]
-precedence (->) 2
-switch value [case, rest...] := (
-  compare [condition, res] test := condition = test => res
-  compare case value | (is rest => switch value rest)
-)
-cond [[condition, result], rest...] := (is condition | is result) => (condition ? result # cond rest)
+typecase x cases := switch (typeof x) cases
+
+let bindings $body := typecase bindings [
+    "object" => (
+        bindings :> get "*context*"
+        force (with bindings body)
+    ),
+    "list" => (
+        env := {} :> get "*context*"
+        map (λ [name, value] -> defineObj env name value) bindings
+        force (with env body)
+    )
+]
 
 for $x $in ls $body := (
-    bindingOf item := (
-        obj := {}
-        defineObj obj (exprToString x) item
-        obj
-    )
-    map (λ item -> force (with (bindingOf item) body)) ls
+    map (λ item -> force (with ({x : item} :> get "*context*") body)) ls
+    null
 )
-
-while $condition $body := condition ? body : while condition body @ []
-do $body $while $condition := body : (condition & while condition body) | []

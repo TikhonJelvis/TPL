@@ -1,21 +1,19 @@
 -- ⟦abc⟧
-puts "Starting loading base!"
-
 define "*precs*" {
     ":="            : 1
     "<-"            : 2
-    "="             : 3
-    "/="            : 3
-    ":"             : 4
-    "+"             : 5
-    "-"             : 5
-    "*"             : 6
-    "/"             : 6
-    "%"             : 6
-    "*application*" : 10
-    "."             : 11
+    "="             : 5
+    "/="            : 5
+    ":"             : 6
+    "+"             : 7
+    "-"             : 7
+    "*"             : 8
+    "/"             : 8
+    "%"             : 8
+    "*application*" : 12
+    "."             : 13
     
-    "*get*"         : λ _ -> 4 -- the default precedence
+    "*get*"         : λ _ -> 6 -- the default precedence
 }
 
 -- TODO: Make sure this works for delayed values! (Perhaps typeof $x = "delayed"?)
@@ -52,8 +50,8 @@ require f := (
 force x := x
 
 require 'base/logic'
+require 'base/function'
 -- require 'base/control'
 -- require 'base/list'
--- require 'base/function'
 -- require 'base/math'
 -- require 'base/string'
