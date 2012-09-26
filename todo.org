@@ -1,0 +1,35 @@
+* Future development
+
+** Lists as objects
+*** TODO Handle lists uniformly as objects
+    Have =[a, b, c]= desugar to ={0 : a; 1 : b; 2 : c}=.
+*** TODO Support mutable lists
+    If a list is just a normal object, you get mutability for free.
+*** TODO Support lazy lists and objects
+    This should allow patterns like =$[a, b, c]= and =[x, $xs...]= to
+    make sense.
+
+** Syntax improvements
+*** TODO Get rid of semi-colons
+    Semi-colons serve the same purpose as commas at the moment; there
+    is no need to have both!
+*** TODO Overloaded syntax
+    Allow the meaning of numeric, string and list literals to be
+    overloaded. Maybe even do the same for object literals.
+*** TODO Reader macros/customizable lexing
+    In the far future, supporting custom notation (like regular
+    expression literals) would be nice.
+
+** Libraries and example code
+*** TODO Fill out basic libraries
+    Get all the old functionality working again.
+*** TODO OOP and classes
+    Add support for classes (ideally with inheritence and stuff) via a
+    library.
+*** TODO Monads
+    Support monads and do-notation, also as a library.
+*** TODO GUI
+    Wrap some gui toolkit, but in a way which makes the dependency
+    optional.
+*** TODO Examples
+    Write some example programs
