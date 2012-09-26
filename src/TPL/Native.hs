@@ -8,7 +8,7 @@ import           Control.Applicative ((<$>))
 import           Control.Arrow       (first, second)
 import           Control.Monad.Error (liftIO)
 
-import           TPL.Env             (bindEnvRef, getEnvRef)
+import           TPL.Env             (bindEnvRef)
 import           TPL.Error           (liftEither, throw)
 import           TPL.Eval            (defineIn, eval, getFrom, readExpr, setIn)
 import           TPL.Pack            (Extract, Pack, extract, native, pack)
@@ -55,7 +55,8 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 ("setObj",       pack setIn),
                 ("defineObj",    pack defineIn),
                 ("loadObj",      pack $ \ env path -> liftIO (readFile path) >>= liftEither . readExpr path >>= eval env),
-                ("with",         pack with)]
+                ("with",         pack with),
+                ("closure",      pack closure)]
           where eqOp :: Value -> Value -> Value
                 eqOp a b = pack $ a == b
                 if' (Bool res) env a b = if res then eval env a else eval env b
@@ -78,14 +79,16 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                           where go (Object ref)
                                   | null args = eval env rval >>= fn ref (String name)
                                   | otherwise = eval env (Lambda args rval) >>= fn ref (String name)
-                                go v            = throw $ TypeMismatch "object" v
+                                go v = throw $ TypeMismatch "object" v
                         exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
                         exec v                              = throw $ BadIdentifier v
-                with ref env (Id x) = getEnvRef env (String x) >>= with' ref
+                with ref env (Id x) = getFrom env (String x) >>= with' ref
                 with ref env expr   = eval env expr >>= with' ref
                 with' (Object ref) (Function _ args body) = return $ Function ref args body
                 with' Object{} f                          = throw $ TypeMismatch "function" f
                 with' o _                                 = throw $ TypeMismatch "object" o
+                closure (Function cl _ _) = return $ Object cl
+                closure v                 = throw $ TypeMismatch "function" v
                 exprToString env (Id x) = getFrom env (String x) >>= displayDeferred
                 exprToString env term = eval env term >>= displayDeferred
                 displayDeferred (Function _ [] e) = return . String $ display e
