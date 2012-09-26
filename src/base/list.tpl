@@ -14,3 +14,5 @@ a .. b := cond [
     else  => a : (succ a .. b)
 ]
 precedence (..) 5
+
+repeat x n := n > 0 ? x : repeat x (n - 1) # []
