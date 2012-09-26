@@ -1,7 +1,6 @@
 module TPL.Eval where
 
 import           Control.Applicative           ((<$>), (<*>), (<|>))
-import           Control.Arrow                 (first)
 import           Control.Monad.Error           (foldM, liftIO, runErrorT,
                                                 throwError)
 
@@ -118,7 +117,7 @@ getArgEnv :: EnvRef -> Term -> Term -> EnvRef -> Result EnvRef
 getArgEnv env (Lambda [] n) arg oldEnv = getArgEnv env n (Lambda [] arg) oldEnv
 getArgEnv env name arg oldEnv = do val <- eval env arg
                                    let context = (String "*context*", Object env)
-                                   bindObj (context : (first String <$> unify name val)) oldEnv
+                                   bindObj (context : unify name val) oldEnv
 
 applyVal :: Value -> Value -> Result Value
 applyVal (Function cl [p] body) val    = newEnv cl p val >>= (`eval` body)
@@ -126,7 +125,7 @@ applyVal (Function cl (p:ps) body) val = (\ e -> Function e ps body) <$> newEnv 
 applyVal fn _                          = Err.throw $ Err.TypeMismatch "function" fn
 
 newEnv :: EnvRef -> Term -> Value -> Result EnvRef
-newEnv env name value = bindObj (first String <$> unify name value) env
+newEnv env name value = bindObj (unify name value) env
 
 defer :: EnvRef -> Term -> Value
 defer env term = Function env [] term
