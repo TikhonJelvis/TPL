@@ -7,7 +7,7 @@ import           Text.Printf        (printf)
 import           TPL.Run
 
 version :: String
-version = "0.5.0"
+version = "0.6.0"
 
 welcome :: String
 welcome = printf "Welcome to TPL version %s\nType \"--quit\" to quit." version
