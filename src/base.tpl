@@ -27,13 +27,11 @@ trimPrecs str := substr str 1 (strlen str - 1)
 precedence $op n := defineObj (get "*precs*") (trimPrecs (exprToString op)) n
 precedenceOf $op := getObj (get "*precs*") (trimPrecs (exprToString op))
 
-print x := puts (toString x)
-
 obj :> parent := (
     defineObj obj "*parent*" parent
     obj
 )
-precedence (:>) 3
+precedence (:>) 4
 
 if cond $res $else $alt := _if cond res alt
 
@@ -51,7 +49,9 @@ force x := x
 
 require 'base/logic'
 require 'base/function'
--- require 'base/control'
--- require 'base/list'
--- require 'base/math'
--- require 'base/string'
+require 'base/control'
+require 'base/list'
+require 'base/math'
+require 'base/string'
+
+print x := puts # if (typeof x = "string") x else (toString x)
