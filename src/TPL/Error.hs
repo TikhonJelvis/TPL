@@ -2,10 +2,10 @@ module TPL.Error where
 
 import qualified Control.Monad.Error as E
 
-import Data.Functor                  ((<$>))
-import Data.List                     (intercalate)
+import           Data.Functor        ((<$>))
+import           Data.List           (intercalate)
 
-import TPL.Value
+import           TPL.Value
 
 showError :: ErrorType -> String
 showError (Parser err) = show err
@@ -14,7 +14,6 @@ showError (Default str) = str
 showError (TypeMismatch expected got) = "Wrong type. Expected " ++ expected ++ "; got " ++ showType got
 showError (MissingOperand op) = "Missing operand for " ++ op
 showError (UndefinedVariable var) = "Variable " ++ displayVal var ++ " is not defined"
-showError (BadNativeCall name expr) = "Invalid native call to " ++ name ++ ": " ++ display (Expression expr)
 showError (TooManyArguments fn) = "Too many arguments passed to " ++ displayVal fn
 showError (BadIdentifier term) =  "Invalid name: " ++ display term
 

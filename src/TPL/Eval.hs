@@ -61,7 +61,7 @@ makeEnvRef :: [(Value, Value)] -> Result EnvRef
 makeEnvRef = fmap EnvRef . liftIO . newIORef . fromList
 
 processOperators :: EnvRef -> Term -> Result Term
-processOperators env expr@(Expression body) =
+processOperators env expr@(Expression s body) =
   do precs <- mapM getPrec $ operators body
      return $ case zip precs $ operators body of
        [] ->  expr
@@ -88,10 +88,10 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
                                     case res of Function closure [] body -> eval closure body
                                                 val                      -> return val
         go e@Expression{} = processOperators env e >>= evalExpr
-          where evalExpr (Expression [])         = return Null
-                evalExpr (Expression [term])     = eval env term
-                evalExpr (Expression (λ : args)) = eval env λ >>= \ fn -> foldM (apply env) fn args
-                evalExpr expression              = eval env expression
+          where evalExpr (Expression _ [])         = return Null
+                evalExpr (Expression _ [term])     = eval env term
+                evalExpr (Expression _ (λ : args)) = eval env λ >>= \ fn -> foldM (apply env) fn args
+                evalExpr expression                = eval env expression
         go (ListLiteral terms) = List <$> mapM (eval env) terms
         go (Lambda args body)  = return $ Function env args body
         go (Block [])          = return Null
@@ -99,8 +99,8 @@ eval env expr = do res <- liftIO . runErrorT . go $ squash expr
         go (ObjectLiteral bindings) = Object <$> newRef
           where newRef = bindings' >>= makeEnvRef
                 bindings' = mapM evalBinding bindings
-                evalBinding (Expression (f:args), body) = evalBinding (f, Lambda args body)
-                evalBinding (key, val)                  = (,) <$> toString key <*> eval env val
+                evalBinding (Expression _ (f:args), body) = evalBinding (f, Lambda args body)
+                evalBinding (key, val)                    = (,) <$> toString key <*> eval env val
                 toString (Id x) = return $ String x
                 toString (StringLiteral s) = return $ String s
                 toString v = Err.throw $ BadIdentifier v

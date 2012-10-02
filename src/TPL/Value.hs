@@ -1,20 +1,22 @@
+{-# LANGUAGE DeriveFunctor #-}
 module TPL.Value where
 
-import qualified Control.Monad.Error as E
+import qualified Control.Monad.Error           as E
 
-import Data.Functor            ((<$>))
-import Data.IORef
-import Data.List               (intercalate)
-import qualified Data.Map as M
+import           Data.Functor                  ((<$>))
+import           Data.IORef
+import           Data.List                     (intercalate)
+import qualified Data.Map                      as M
 
-import Text.ParserCombinators.Parsec (ParseError)
+import           Text.ParserCombinators.Parsec (ParseError, SourcePos)
 
 type Number = Integer
 
 data NativeOpr = NativeOpr (EnvRef -> Term -> Result Value)
 
+                 -- These instances are a bit of a horrible hack...
 instance Eq NativeOpr where _ == _ = False
-  
+
 instance Show NativeOpr where show = const "[native code]"
 instance Ord NativeOpr where compare _ _ = EQ
 
@@ -26,9 +28,15 @@ data Term = NullLiteral
           | Operator String
           | ListLiteral [Term]
           | Lambda [Term] Term
-          | Expression [Term]
+          | Expression String [Term]
           | Block [Term]
           | ObjectLiteral [(Term, Term)] deriving (Show, Eq, Ord)
+
+data Annot a v = Annot { annot :: a
+                       , value :: v } deriving (Show, Eq, Ord, Functor)
+
+data Source = Source { pos  :: SourcePos
+                     , text :: String } deriving (Show, Eq, Ord)
 
 display :: Term -> String
 display NullLiteral         = "null"
@@ -39,7 +47,7 @@ display (BoolLiteral bool)  = if bool then "true" else "false"
 display (Operator op)       = op
 display (ListLiteral ls)    = "[" ++ displayList ", " ls ++ "]"
 display (Lambda args body)  = "λ " ++ displayList " " args ++ " → " ++ display body
-display (Expression terms)  = "(" ++ displayList " " terms ++ ")"
+display (Expression disp _) = disp
 display (Block terms)       = displayList " " terms
 display (ObjectLiteral _)   = "{...}" -- TODO: display object literals properly!
 
@@ -66,15 +74,15 @@ displayVal (Object _)             = "{...}"
 displayVal (Native opr)          = "<λ>: " ++ show opr
 
 type Env = M.Map Value Value
-                                    
+
 newtype EnvRef = EnvRef (IORef Env) deriving (Eq)
 
 instance Show EnvRef where show _ = "<env>"
 instance Ord EnvRef where compare _ _ = EQ
-                          
+
 nullEnv :: IO EnvRef
 nullEnv = EnvRef <$> newIORef M.empty
-                           
+
 showType :: Value -> String
 showType Null       = "null"
 showType Number{}   = "number"
@@ -99,7 +107,6 @@ data ErrorType = Parser ParseError
                | MissingOperand String
                | TypeMismatch String Value
                | UndefinedVariable Value
-               | BadNativeCall String [Term]
                | TooManyArguments Value
                | BadIdentifier Term
                | Default String deriving (Show)

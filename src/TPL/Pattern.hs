@@ -4,11 +4,11 @@ import           TPL.Value
 
   -- TODO: fix how delayed things are matched!
 unify :: Term -> Value -> [(Value, Value)]
-unify (Expression [pat]) val      = unify pat val
+unify (Expression _ [pat]) val     = unify pat val
 unify (Lambda _ pat) val          = unify pat val
 unify (Id name) val               = [(String name, val)]
 unify (ListLiteral ls) (List vs)  = case last ls of
-  Expression [pat, Operator "..."] ->
+  Expression _ [pat, Operator "..."] ->
     unifyMany (init ls) (take len vs) ++ unifyRest pat (drop len vs)
   _ -> unifyMany ls vs
   where len = length $ init ls

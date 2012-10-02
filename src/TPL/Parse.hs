@@ -3,10 +3,19 @@ module TPL.Parse where
 import           Control.Applicative           ((*>), (<$), (<$>), (<*), (<*>))
 
 import           Data.Char                     (isPunctuation, isSymbol)
+import           Data.List                     ((\\))
 
 import           Text.ParserCombinators.Parsec
 
 import           TPL.Value
+
+  -- Parses an expression, keeping track of its source string.
+expr :: Parser [Term] -> Parser Term
+expr p = do inp  <- getInput
+            res  <- p
+            inp' <- getInput
+            let len = length inp - length inp'
+            return $ Expression (take len inp) res
 
 comment :: Parser ()
 comment = () <$ (try $ string "--" *> many (noneOf "\n")) <?> ""
@@ -66,7 +75,7 @@ object = char '{' *> allSpaces *> (ObjectLiteral <$> many binding) <* char '}' <
   where binding = (,) <$> (key <* allSpaces <* char ':')
                       <*> (allSpaces *> expression <* end)
         key = try method <|> identifier <|> stringLiteral <|> num
-        method = Expression <$> ((:) <$> identifier <*> many1 argument)
+        method = expr ((:) <$> identifier <*> many1 argument)
 
 argument :: Parser Term
 argument = identifier <|> list <|> delayedExp
@@ -83,7 +92,7 @@ block :: Parser Term
 block = between (char '(' *> allSpaces) (char ')' *> whitespace) expressions
 
 expression :: Parser Term
-expression = Expression <$> many1 atom <?> "expression"
+expression = expr (many1 atom) <?> "expression"
 
 atom :: Parser Term
 atom =  lambda
@@ -107,3 +116,4 @@ program = expressions <* eof
 end :: Parser ()
 end = (terminator *> allSpaces) <|> lookAhead (() <$ oneOf "})")
   where terminator = () <$ oneOf ";\n" <|> eof
+

@@ -62,25 +62,25 @@ natives = first String <$> (convert math ++ convert comp ++ rest)
                 if' (Bool res) env a b = if res then eval env a else eval env b
                 if' v _ _ _            = throw $ TypeMismatch "boolean" v
                 execOnId fn env inp rval = exec . simplify $ desugar inp
-                  where simplify (Expression terms) = Expression $ terms >>= flattenExprs
-                        simplify x                  = x
-                        flattenExprs (Expression e) = e >>= flattenExprs
-                        flattenExprs e              = [e]
+                  where simplify (Expression s terms) = Expression s $ terms >>= flattenExprs
+                        simplify x                    = x
+                        flattenExprs (Expression _ e) = e >>= flattenExprs
+                        flattenExprs e                = [e]
                         exec (Id x) = eval env rval >>= fn env (String x)
                         exec names@ListLiteral{} =
                           do v <- eval env rval
                              mapM_ (uncurry $ fn env) $ unify names v
                              return v
-                        exec (Expression [a, Operator op, b]) = exec $ Expression [Id op, a, b]
-                        exec (Expression (Operator op : args)) = exec . Expression $ Id op : args
-                        exec (Expression (Id ".":obj:Id name:args)) =
+                        exec (Expression s [a, Operator op, b]) = exec $ Expression s [Id op, a, b]
+                        exec (Expression s (Operator op : args)) = exec . Expression s $ Id op : args
+                        exec (Expression _ (Id ".":obj:Id name:args)) =
                           eval env obj >>= go
                           where go (Object ref)
                                   | null args = eval env rval >>= fn ref (String name)
                                   | otherwise = eval env (Lambda args rval) >>= fn ref (String name)
                                 go v = throw $ TypeMismatch "object" v
-                        exec (Expression (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
-                        exec v                              = throw $ BadIdentifier v
+                        exec (Expression s (fname@Id{}:args)) = execOnId fn env fname $ Lambda args rval
+                        exec v                                = throw $ BadIdentifier v
                 with ref env (Id x) = getFrom env (String x) >>= with' ref
                 with ref env expr   = eval env expr >>= with' ref
                 with' (Object ref) (Function _ args body) = return $ Function ref args body
