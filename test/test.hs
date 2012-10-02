@@ -13,6 +13,8 @@ import           System.IO.Silently
 import           Test.QuickCheck
 import           Test.QuickCheck.All
 
+import           Text.Printf
+
 import           TPL.Run
 
 main = do samples <- runSamples
@@ -22,9 +24,17 @@ main = do samples <- runSamples
 runSamples = do files <- getCurrentDirectory >>= getDirectoryContents
                 let scripts = sort $ filter (isSuffixOf ".tpl") files
                 let out     = sort $ filter (isSuffixOf ".out") files
-                and <$> zipWithM runTest scripts out
+                results <- zipWithM runTest scripts out
+                printf "Passed %d/%d tests.\n" (length $ filter id results) (length results)
+                return $ and results
   where runTest file out = do (result, ()) <- capture $ runFile file
-                              return $ result == out
+                              expected    <- readFile out
+                              let failed = result /= expected
+                              when failed $ do putStrLn $ "Failed " ++ file
+                                               putStr   $ "Expected:\n" ++ expected
+                                               putStr   $ "Got:\n" ++ result
+                                               putStrLn $ replicate 80 '-'
+                              return $ not failed
 
 runQuickCheck = return () -- $quickCheckAll
 
