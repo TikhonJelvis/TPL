@@ -25,7 +25,7 @@ until_ predicate prompt action =
 
 prelude :: IO EnvRef
 prelude = do env <- baseEnv
-             path <- catch (getEnv "TPL_PATH") (\ _ -> getCurrentDirectory)
+             path <- getEnv "TPL_PATH"
              _    <- runErrorT $ defineIn env (String "TPL_PATH") $ String path
              _    <- evalString "<prelude>" env $ "loadObj (get '*current*') '" ++ path ++ "/base.tpl'"
              return $ env
